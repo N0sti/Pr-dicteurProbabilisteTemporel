@@ -79,35 +79,61 @@ def predire_production_electricite(puissance_nominale_par_panneau, nombre_de_pan
     return energie_produite_heure
 
 # Fonction pour stocker les nouvelles valeurs dans un fichier JSON dans le fichier historique
-# Fonction pour stocker les nouvelles valeurs dans un fichier JSON dans le fichier historique
-def stocker_donnees_json(ensoleillement_actuel, temperature_actuelle, energie_produite, timestamp):
+def stocker_donnees_json(energie_produite, timestamp):
     donnees = {
-        "ensoleillement_actuel": ensoleillement_actuel,
-        "temperature_actuelle": temperature_actuelle,
         "energie_produite": energie_produite,
         "timestamp": timestamp
     }
 
     try:
-        # Lire les données existantes
-        with open('donnees_historiques.json', 'r') as f:
+        with open('donnees_graphs.json', 'r') as f:
             donnees_existantes = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         donnees_existantes = []
 
-    # Ajouter la nouvelle entrée de données
     donnees_existantes.append(donnees)
 
-    # Stocker les données mises à jour dans le fichier
-    with open('donnees_historiques.json', 'w') as f:
+    with open('donnees_graphs.json', 'w') as f:
         json.dump(donnees_existantes, f, indent=4)
 
-    print(f"Nouvelle donnée ajoutée: {donnees}")  # Imprimer les nouvelles données ajoutées pour le débogage
-
-
+    print(f"Nouvelle donnée ajoutée: {donnees}")
 
 # Fonction pour afficher un graphique de la production d'électricité
 def afficher_graphique():
+    try:
+        with open('donnees_graphs.json', 'r') as fichier:
+            donnees = json.load(fichier)
+    except (FileNotFoundError, json.JSONDecodeError):
+        print("Aucune donnée valide trouvée pour afficher le graphique.")
+        return
+
+    if not donnees:
+        print("Le fichier JSON ne contient aucune donnée.")
+        return
+
+    timestamps = []
+    energie_produite = []
+
+    for entry in donnees:
+        if 'timestamp' in entry and 'energie_produite' in entry:
+            timestamps.append(entry['timestamp'])
+            energie_produite.append(entry['energie_produite'])
+
+    if not timestamps or not energie_produite:
+        print("Aucune donnée valide à afficher.")
+        return
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(timestamps, energie_produite, marker='o', linestyle='-', color='blue', label='Énergie produite')
+    plt.xlabel('Temps')
+    plt.ylabel('Énergie produite (kWh)')
+    plt.title('Production d\'électricité au fil du temps')
+    plt.xticks(rotation=45, fontsize=8)
+    plt.yticks(fontsize=10)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
     try:
         with open('donnees_historiques.json', 'r') as fichier:
             donnees = json.load(fichier)
@@ -166,7 +192,7 @@ if __name__ == "__main__":
     timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
     # Stocker les nouvelles valeurs dans un fichier JSON
-    stocker_donnees_json(ensoleillement_actuel, temperature_actuelle, energie_produite, timestamp)
+    stocker_donnees_json(energie_produite, timestamp)
 
     # Afficher les résultats
     print(f"Ensoleillement actuel: {ensoleillement_actuel * 100}%")
