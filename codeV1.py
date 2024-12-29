@@ -2,9 +2,10 @@ import os
 import subprocess
 import requests
 import datetime
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import matplotlib.pyplot as plt
+
 
 
 # Paramètres d'entrée
@@ -166,6 +167,28 @@ def predire_production_electricite(puissance_nominale_par_panneau, nombre_de_pan
     energie_produite_heure = puissance_installée * ensoleillement_actuel * efficacite_ajustee * facteur_de_performance  # kWh
     return energie_produite_heure
 
+def filtrer_donnees_mois_precedent(donnees_historiques):
+    timestamps = donnees_historiques[0]['hourly']['time']
+    temperatures = donnees_historiques[0]['hourly']['temperature_2m']
+    cloud_covers = donnees_historiques[0]['hourly']['cloud_cover']
+
+    # Calculer la date du premier jour du mois précédent
+    today = datetime.now()
+    first_day_of_previous_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+
+    filtered_timestamps = []
+    filtered_temperatures = []
+    filtered_cloud_covers = []
+
+    for i in range(len(timestamps)):
+        timestamp = datetime.strptime(timestamps[i], '%Y-%m-%dT%H:%M')
+        if timestamp >= first_day_of_previous_month:
+            filtered_timestamps.append(timestamps[i])
+            filtered_temperatures.append(temperatures[i])
+            filtered_cloud_covers.append(cloud_covers[i])
+
+    return filtered_timestamps, filtered_temperatures, filtered_cloud_covers
+
 # Fonction pour stocker les nouvelles valeurs dans un fichier JSON dans le fichier historique
 def stocker_donnees_json(energie_produite, current_datetime ):
     donnees = {
@@ -186,6 +209,84 @@ def stocker_donnees_json(energie_produite, current_datetime ):
 
     print(f"Nouvelle donnée ajoutée: {donnees}")
 
+def charger_donnees_historiques():
+    try:
+        with open('donnees_historiques.json', 'r') as fichier:
+            donnees = json.load(fichier)
+    except (FileNotFoundError, json.JSONDecodeError):
+        print("Aucune donnée valide trouvée pour afficher le graphique.")
+        return None
+    return donnees
+
+def calculer_production_quotidienne(filtered_timestamps, filtered_temperatures, filtered_cloud_covers):
+    production_quotidienne = {}
+    current_date = None
+    daily_production = 0
+
+    for i in range(len(filtered_timestamps)):
+        timestamp = filtered_timestamps[i]
+        date = timestamp.split('T')[0]
+        temperature_actuelle = filtered_temperatures[i]
+        cloud_cover = filtered_cloud_covers[i]
+        ensoleillement_actuel = (100 - cloud_cover) / 100
+        energie_produite = predire_production_electricite(
+            puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
+            efficacite_panneaux, ensoleillement_actuel, inclinaison_panneaux,
+            orientation_panneaux, facteur_de_performance, temperature_actuelle)
+
+        if current_date is None:
+            current_date = date
+
+        if date == current_date:
+            daily_production += energie_produite
+        else:
+            production_quotidienne[current_date] = daily_production
+            current_date = date
+            daily_production = energie_produite
+
+    if current_date:
+        production_quotidienne[current_date] = daily_production
+
+    return production_quotidienne
+
+def afficher_graphique_quotidien(production_quotidienne):
+    dates = list(production_quotidienne.keys())
+    production = list(production_quotidienne.values())
+
+    # Formater les dates au format 30/09/2024
+    formatted_dates = [datetime.strptime(date, '%Y-%m-%d').strftime('%d/%m/%Y') for date in dates]
+    print("formatted_dates", formatted_dates)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(formatted_dates, production, marker='o', linestyle='-', color='blue', label='Énergie produite')
+    plt.xlabel('Date')
+    plt.ylabel('Énergie produite (kWh)')
+    plt.title('Production d\'électricité quotidienne')
+    plt.xticks(rotation=45, fontsize=8)
+    plt.yticks(fontsize=10)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    timestamps = donnees_historiques[0]['hourly']['time']
+    temperatures = donnees_historiques[0]['hourly']['temperature_2m']
+    cloud_covers = donnees_historiques[0]['hourly']['cloud_cover']
+
+    production_mensuelle = []
+
+    for i in range(len(timestamps)):
+        temperature_actuelle = temperatures[i]
+        cloud_cover = cloud_covers[i]
+        ensoleillement_actuel = (100 - cloud_cover) / 100
+        energie_produite = predire_production_electricite(
+            puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
+            efficacite_panneaux, ensoleillement_actuel, inclinaison_panneaux,
+            orientation_panneaux, facteur_de_performance, temperature_actuelle)
+        production_mensuelle.append(energie_produite)
+    print("production_mensuelle", production_mensuelle)
+
+    return timestamps, production_mensuelle
 # Fonction pour afficher un graphique de la production d'électricité
 def afficher_graphique():
     try:
@@ -305,9 +406,14 @@ if __name__ == "__main__":
     print(f"Température actuelle: {temperature_actuelle}°C")
     print(f"Énergie produite actuelle: {energie_produite:.2f} kWh")
     print(f"Timestamp: {current_datetime}")
-
     # Afficher le graphique de la production d'électricité
     afficher_graphique()
+    
+    donnees_historiques = charger_donnees_historiques()
+    if donnees_historiques:
+        filtered_timestamps, filtered_temperatures, filtered_cloud_covers = filtrer_donnees_mois_precedent(donnees_historiques)
+        production_quotidienne = calculer_production_quotidienne(filtered_timestamps, filtered_temperatures, filtered_cloud_covers)
+        afficher_graphique_quotidien(production_quotidienne)
 
 #stocker les nouvelles valeurs dans un json hourly et daily
 #afficher un graphe de ce qui a ete produit jusqu'a present
