@@ -31,6 +31,7 @@ def obtenir_donnees_meteo_actuelles():
     # Construire l'URL avec les dates dynamiques
     url = (f'https://api.open-meteo.com/v1/forecast?latitude=48.7833&longitude=2.3333&&start_hour={start_date}&end_hour={end_date}&hourly=temperature_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high&timezone=Europe%2FBerlin')
     # Faire la requête HTTP
+    print("url one is", url)
     response = requests.get(url)
     response.raise_for_status()  # Vérifie les erreurs HTTP
     data = response.json()
@@ -62,6 +63,29 @@ def calculer_ensoleillement_et_temperature(data):
     print(f"Ensoleillement actuel: {ensoleillement_actuel * 100}%")
     print(f"Température actuelle: {temperature_actuelle}°C")
     return ensoleillement_actuel, temperature_actuelle
+
+def mettre_a_jour_historique(data):
+    print("testststts", data)
+    fichier_historique = 'donnees_historiques.json'
+    # Charger le fichier historique
+    with open(fichier_historique, 'r') as file:
+        historique = json.load(file)
+    print("data", data)
+    print(data['hourly']['time'])
+    print(data['hourly']['temperature_2m'])
+    print(data['hourly']['cloud_cover'])
+    print(data['hourly']['cloud_cover_low'])
+    print(data['hourly']['cloud_cover_mid'])
+    print(data['hourly']['cloud_cover_high'])
+    # Ajouter les nouvelles données à la section "hourly" de l'historique
+    #print("historique",  historique[0]['hourly']['time'])
+    for item in data['hourly']['time']:
+        historique[0]['hourly']['time'].append(item)
+    print("historique",  historique[0]['hourly']['time'])
+    # Sauvegarder les modifications dans le fichier historique
+    with open(fichier_historique, 'w') as file:
+        json.dump(historique, file, indent=4)
+    print("Historique mis à jour avec succès.")
 
 # Fonction pour prédire la production d'électricité en temps réel
 def predire_production_electricite(puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
@@ -178,6 +202,11 @@ if __name__ == "__main__":
 
     # Obtenir les données météorologiques actuelles
     data_meteo_actuelles = obtenir_donnees_meteo_actuelles()
+    print("Type de data_meteo_actuelles:", type(data_meteo_actuelles))
+    print("Contenu de data_meteo_actuelles:", data_meteo_actuelles)
+
+
+    mettre_a_jour_historique(data_meteo_actuelles)
 
     # Calculer l'ensoleillement et la température actuels
     ensoleillement_actuel, temperature_actuelle = calculer_ensoleillement_et_temperature(data_meteo_actuelles)
