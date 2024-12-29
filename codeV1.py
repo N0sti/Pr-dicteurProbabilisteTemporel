@@ -17,13 +17,7 @@ orientation_panneaux = 0  # degrés par rapport au sud (0 degrés = plein sud)
 facteur_de_performance = 0.85
 
 # Fonction pour obtenir les données météorologiques actuelles
-def obtenir_donnees_meteo_actuelles():
-    # Obtenez la date et l'heure actuelle
-    current_datetime = datetime.now()
-
-    # Troncature de l'heure à l'heure entière (ignorer les minutes et les secondes)
-    current_datetime = current_datetime.replace(minute=0, second=0, microsecond=0)
-
+def obtenir_donnees_meteo_actuelles_hourly(current_datetime):
     # Formater start_date et end_date au format requis (YYYY-MM-DDTHH:MM)
     start_date = current_datetime.strftime('%Y-%m-%dT%H:%M')
     end_date = current_datetime.strftime('%Y-%m-%dT%H:%M')
@@ -37,7 +31,23 @@ def obtenir_donnees_meteo_actuelles():
     data = response.json()
     
     return data
-   
+
+def obtenir_donnees_meteo_actuelles_daily(current_datetime):
+    # Formater start_date et end_date au format requis (YYYY-MM-DDTHH:MM)
+    start_date = current_datetime.strftime('%Y-%m-%d')
+    end_date = current_datetime.strftime('%Y-%m-%d')
+
+    # Construire l'URL avec les dates dynamiques
+    url = (f'https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=48.7833&longitude=2.3333&start_date={start_date}&end_date={end_date}&hourly=temperature_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high&daily=sunrise,sunset,daylight_duration,sunshine_duration&timezone=Europe%2FBerlin')
+    # Faire la requête HTTP
+    print("url one is", url)
+    response = requests.get(url)
+    response.raise_for_status()  # Vérifie les erreurs HTTP
+    data = response.json()
+    print("data", data)
+    
+    return data
+
 # Fonction pour calculer l'ensoleillement et la température actuels
 def calculer_ensoleillement_et_temperature(data):
     print(data)  # Débogage pour afficher les données reçues
@@ -64,13 +74,13 @@ def calculer_ensoleillement_et_temperature(data):
     print(f"Température actuelle: {temperature_actuelle}°C")
     return ensoleillement_actuel, temperature_actuelle
 
-def mettre_a_jour_historique(data):
+def mettre_a_jour_historique_hourly(data):
     print("testststts", data)
     fichier_historique = 'donnees_historiques.json'
     # Charger le fichier historique
     with open(fichier_historique, 'r') as file:
         historique = json.load(file)
-    print("data", data)
+    #print("data", data)
     print(data['hourly']['time'])
     print(data['hourly']['temperature_2m'])
     print(data['hourly']['cloud_cover'])
@@ -81,8 +91,62 @@ def mettre_a_jour_historique(data):
     #print("historique",  historique[0]['hourly']['time'])
     for item in data['hourly']['time']:
         historique[0]['hourly']['time'].append(item)
-    print("historique",  historique[0]['hourly']['time'])
+    #print("historique",  historique[0]['hourly']['time'])
+    for item in data['hourly']['temperature_2m']:
+        historique[0]['hourly']['temperature_2m'].append(item)
+    #print("historique",  historique[0]['hourly']['temperature_2m'])
+    for item in data['hourly']['cloud_cover']:
+        historique[0]['hourly']['cloud_cover'].append(item)
+    #print("historique",  historique[0]['hourly']['cloud_cover'])
+    for item in data['hourly']['cloud_cover_low']:
+        historique[0]['hourly']['cloud_cover_low'].append(item)
+    #print("historique",  historique[0]['hourly']['cloud_cover_low'])
+    for item in data['hourly']['cloud_cover_mid']:
+        historique[0]['hourly']['cloud_cover_mid'].append(item)
+    #print("historique",  historique[0]['hourly']['cloud_cover_mid'])
+    for item in data['hourly']['cloud_cover_high']:
+        historique[0]['hourly']['cloud_cover_high'].append(item)
+    #print("historique",  historique[0]['hourly']['cloud_cover_high'])
     # Sauvegarder les modifications dans le fichier historique
+    with open(fichier_historique, 'w') as file:
+        json.dump(historique, file, indent=4)
+    print("Historique mis à jour avec succès.")
+
+def mettre_a_jour_historique_daily(data):
+    print("testststts", data)
+    fichier_historique = 'donnees_historiques.json'
+    # Charger le fichier historique
+    with open(fichier_historique, 'r') as file:
+        historique = json.load(file)
+    #print("data", data)
+    print(data['daily']['time'])
+    print(data['daily']['sunrise'])
+    print(data['daily']['sunset'])
+    print(data['daily']['daylight_duration'])
+    print(data['daily']['sunshine_duration'])
+    # Ajouter les nouvelles données à la section "hourly" de l'historique
+    #print("historique",  historique[0]['daily']['time'])
+    for item in data['daily']['time']:
+        historique[0]['daily']['time'].append(item)
+    #print("historique",  historique[0]['daily']['time'])
+
+    for item in data['daily']['sunrise']:
+        historique[0]['daily']['sunrise'].append(item)
+    print("historique",  historique[0]['daily']['sunrise'])
+
+    for item in data['daily']['sunset']:
+        historique[0]['daily']['sunset'].append(item)
+    #print("historique",  historique[0]['daily']['sunset'])
+
+    for item in data['daily']['daylight_duration']:
+        historique[0]['daily']['daylight_duration'].append(item)
+    #print("historique",  historique[0]['daily']['daylight_duration'])
+
+    for item in data['daily']['sunshine_duration']:
+        historique[0]['daily']['sunshine_duration'].append(item)
+    #print("historique",  historique[0]['daily']['sunshine_duration'])
+
+    #Sauvegarder les modifications dans le fichier historique
     with open(fichier_historique, 'w') as file:
         json.dump(historique, file, indent=4)
     print("Historique mis à jour avec succès.")
@@ -103,10 +167,10 @@ def predire_production_electricite(puissance_nominale_par_panneau, nombre_de_pan
     return energie_produite_heure
 
 # Fonction pour stocker les nouvelles valeurs dans un fichier JSON dans le fichier historique
-def stocker_donnees_json(energie_produite, timestamp):
+def stocker_donnees_json(energie_produite, current_datetime ):
     donnees = {
         "energie_produite": energie_produite,
-        "timestamp": timestamp
+        "timestamp": current_datetime.strftime('%d/%m/%Y %H:%M:%S')
     }
 
     try:
@@ -195,21 +259,34 @@ def afficher_graphique():
     plt.tight_layout()
     plt.show()
 
+def get_current_datetime():
+    # Obtenez la date et l'heure actuelle
+    current_datetime = datetime.now()
+
+    # Troncature de l'heure à l'heure entière (ignorer les minutes et les secondes)
+    current_datetime = current_datetime.replace(minute=0, second=0, microsecond=0)
+    print("current_datetime:", current_datetime)
+    return current_datetime # Retourne la date et l'heure actuelles
+
 # Programme principal
 if __name__ == "__main__":
     
     subprocess.run(['python', 'historique_donnees.py'], check=True)  # Exécution du script et attente de la fin
-
+    current_datetime=get_current_datetime()
     # Obtenir les données météorologiques actuelles
-    data_meteo_actuelles = obtenir_donnees_meteo_actuelles()
-    print("Type de data_meteo_actuelles:", type(data_meteo_actuelles))
-    print("Contenu de data_meteo_actuelles:", data_meteo_actuelles)
-
-
-    mettre_a_jour_historique(data_meteo_actuelles)
+    data_meteo_actuelles_hourly = obtenir_donnees_meteo_actuelles_hourly(current_datetime)
+    print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_hourly))
+    print("Contenu de data_meteo_actuelles:", data_meteo_actuelles_hourly)
+    mettre_a_jour_historique_hourly(data_meteo_actuelles_hourly)
+    if current_datetime.hour==23: #mettre a jour avec les donnée de la journée
+        data_meteo_actuelles_daily = obtenir_donnees_meteo_actuelles_daily(current_datetime)
+        print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_daily))
+        print("Contenu de data_meteo_actuelles:", data_meteo_actuelles_daily)
+        mettre_a_jour_historique_daily(data_meteo_actuelles_daily)
+  
 
     # Calculer l'ensoleillement et la température actuels
-    ensoleillement_actuel, temperature_actuelle = calculer_ensoleillement_et_temperature(data_meteo_actuelles)
+    ensoleillement_actuel, temperature_actuelle = calculer_ensoleillement_et_temperature(data_meteo_actuelles_hourly)
 
     # Prédire la production d'électricité en temps réel
     energie_produite = predire_production_electricite(
@@ -218,26 +295,26 @@ if __name__ == "__main__":
         orientation_panneaux, facteur_de_performance, temperature_actuelle)
 
     # Obtenir le timestamp actuel
-    timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    #timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
 
     # Stocker les nouvelles valeurs dans un fichier JSON
-    stocker_donnees_json(energie_produite, timestamp)
-
+    #stocker_donnees_json(energie_produite, timestamp)
+    stocker_donnees_json(energie_produite, current_datetime)
     # Afficher les résultats
     print(f"Ensoleillement actuel: {ensoleillement_actuel * 100}%")
     print(f"Température actuelle: {temperature_actuelle}°C")
     print(f"Énergie produite actuelle: {energie_produite:.2f} kWh")
-    print(f"Timestamp: {timestamp}")
+    print(f"Timestamp: {current_datetime}")
 
     # Afficher le graphique de la production d'électricité
     afficher_graphique()
 
 #stocker les nouvelles valeurs dans un json hourly et daily
-#afficher un phraphe de ce qui a ete produit jusqu'a present
+#afficher un graphe de ce qui a ete produit jusqu'a present
 #jouer avec les graphiques pour afficher genre le surplus d'energie produite ou 
 #ce qui au contrainre a du etre achetrer pour combler le manque, l'argent economisé, etc
 #utiliser une Régression linéaire bayésienne pour prédire la production d'électricité avec Pyro
 #pour prédire la production d'électricité future, on va devoir prédire les variable de notre code qui ici sont l'ensoleillement moyen et la température moyenne
-#pour predire ces variables, on vas utiliser les donnée sur ensoleillement moyen et la température moyenne, qu'on aura stoker a chaque fois qu'on va les recuperer
+#pour predire ces variables, on vas utiliser les donnée sur ensoleillement moyen et la température moyenne et la duree d'ensoleillemnt, qu'on aura stoker a chaque fois qu'on va les recuperer
 #Faire un site web pour afficher les données et les predictions
 #afficher sur le passee l'ecart entre les prediction de production d'energie et la production d'energie reel

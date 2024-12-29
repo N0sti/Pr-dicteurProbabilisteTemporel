@@ -12,7 +12,7 @@ def obtenir_donnees_historiques(start, end):
     end_date = datetime.datetime.fromtimestamp(end).strftime('%Y-%m-%d')
     print("start_date:", start_date)
     print("end_date:", end_date)
-    end_date='2024-12-28'
+    #end_date='2024-12-28'
     # Construire l'URL avec les dates dynamiques
     url = f'https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=48.7833&longitude=2.3333&start_date={start_date}&end_date={end_date}&hourly=temperature_2m,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high&daily=sunrise,sunset,daylight_duration,sunshine_duration&timezone=Europe%2FBerlin'
     print("ttttttttt", url)
