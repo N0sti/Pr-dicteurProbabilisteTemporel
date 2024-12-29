@@ -232,7 +232,7 @@ if __name__ == "__main__":
     # Afficher le graphique de la production d'électricité
     afficher_graphique()
 
-#stocker les nouvelles valeurs dans un json
+#stocker les nouvelles valeurs dans un json hourly et daily
 #afficher un phraphe de ce qui a ete produit jusqu'a present
 #jouer avec les graphiques pour afficher genre le surplus d'energie produite ou 
 #ce qui au contrainre a du etre achetrer pour combler le manque, l'argent economisé, etc
