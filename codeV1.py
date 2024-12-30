@@ -1,3 +1,4 @@
+from asyncio import sleep
 import os
 import subprocess
 import requests
@@ -5,7 +6,12 @@ import datetime
 from datetime import datetime, timedelta
 import json
 import matplotlib.pyplot as plt
-
+import pyro
+import pyro.distributions as dist
+from pyro.infer import MCMC, NUTS
+from pyro.infer import Predictive
+import torch
+import numpy as np
 
 
 # Paramètres d'entrée
@@ -166,6 +172,129 @@ def predire_production_electricite(puissance_nominale_par_panneau, nombre_de_pan
 
     energie_produite_heure = puissance_installée * ensoleillement_actuel * efficacite_ajustee * facteur_de_performance  # kWh
     return energie_produite_heure
+
+#but aller chopper les donne d'entrainement pour pourvoir faire des prediction
+def donnee_entrainement(donnees_historiques):
+    hourly_timestamps_entrainement = donnees_historiques[0]['hourly']['time']
+    daily_timestamps_entrainement = donnees_historiques[0]['daily']['time']
+    temperatures_entrainement = donnees_historiques[0]['hourly']['temperature_2m']
+    cloud_covers_entrainement = donnees_historiques[0]['hourly']['cloud_cover']
+    sunrise_entrainement = donnees_historiques[0]['daily']['sunrise']
+    sunset_entrainement = donnees_historiques[0]['daily']['sunset']
+
+    temperatures_tenseur = torch.tensor(temperatures_entrainement, dtype=torch.float32)
+    cloud_covers_tenseur = torch.tensor(cloud_covers_entrainement, dtype=torch.float32)
+    sunrise_tenseur = torch.tensor([datetime.strptime(time, '%Y-%m-%dT%H:%M').hour + datetime.strptime(time, '%Y-%m-%dT%H:%M').minute / 60 for time in sunrise_entrainement], dtype=torch.float32)
+    sunset_tenseur = torch.tensor([datetime.strptime(time, '%Y-%m-%dT%H:%M').hour + datetime.strptime(time, '%Y-%m-%dT%H:%M').minute / 60 for time in sunset_entrainement], dtype=torch.float32)
+
+    time_temperatures = torch.arange(len(temperatures_tenseur), dtype=torch.float32)
+    time_sunrise = torch.arange(len(sunrise_tenseur), dtype=torch.float32)
+    time_sunset = torch.arange(len(sunset_tenseur), dtype=torch.float32)
+
+    print(f"Shape of temperatures: {temperatures_tenseur.shape}")
+    print(f"Shape of cloud_covers: {cloud_covers_tenseur.shape}")
+    print(f"Shape of sunrise: {sunrise_tenseur.shape}")
+    print(f"Shape of sunset: {sunset_tenseur.shape}")
+    print(f"Shape of time_temperatures: {time_temperatures.shape}")
+    print(f"Shape of time_sunrise: {time_sunrise.shape}")
+    print(f"Shape of time_sunset: {time_sunset.shape}")
+
+    return temperatures_tenseur, cloud_covers_tenseur, sunrise_tenseur, sunset_tenseur, time_temperatures, time_sunrise, time_sunset
+
+def model_sunrise_sinusoidal(time, sunrise):
+    a = pyro.sample("a", dist.Normal(0., 10.))
+    b = pyro.sample("b", dist.Normal(0., 10.))
+    c = pyro.sample("c", dist.Normal(0., 10.))
+    sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
+
+    mean = a + b * torch.sin(2 * np.pi * time / 365) + c * torch.cos(2 * np.pi * time / 365)
+
+    if sunrise is not None:
+        with pyro.plate("data", len(sunrise)):
+            return pyro.sample("obs", dist.Normal(mean[:len(sunrise)], sigma), obs=sunrise)
+    else:
+        with pyro.plate("data", len(time)):
+            return pyro.sample("obs", dist.Normal(mean, sigma))
+
+def model_sunset_sinusoidal(time, sunset):
+    a = pyro.sample("a", dist.Normal(0., 10.))
+    b = pyro.sample("b", dist.Normal(0., 10.))
+    c = pyro.sample("c", dist.Normal(0., 10.))
+    sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
+
+    mean = a + b * torch.sin(2 * np.pi * time / 365) + c * torch.cos(2 * np.pi * time / 365)
+
+    if sunset is not None:
+        with pyro.plate("data", len(sunset)):
+            return pyro.sample("obs", dist.Normal(mean[:len(sunset)], sigma), obs=sunset)
+    else:
+        with pyro.plate("data", len(time)):
+            return pyro.sample("obs", dist.Normal(mean, sigma))
+
+def model_temperature_seasonal(time, temperatures):
+    a = pyro.sample("a", dist.Normal(0., 10.))
+    b = pyro.sample("b", dist.Normal(0., 10.))
+    c = pyro.sample("c", dist.Normal(0., 10.))
+    sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
+
+    mean = a + b * time + c * torch.sin(2 * np.pi * time / 365)
+
+    if temperatures is not None:
+        with pyro.plate("data", len(temperatures)):
+            return pyro.sample("obs", dist.Normal(mean[:len(temperatures)], sigma), obs=temperatures)
+    else:
+        with pyro.plate("data", len(time)):
+            return pyro.sample("obs", dist.Normal(mean, sigma))
+
+def model_cloud_covers(time, cloud_covers):
+    """
+    Bayesian linear regression model for cloud cover predictions
+    """
+    a = pyro.sample("a", dist.Normal(0., 10.))
+    b = pyro.sample("b", dist.Normal(0., 10.))
+    sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
+    
+    mean = a + b * time
+    
+    if cloud_covers is not None:
+        with pyro.plate("data", len(cloud_covers)):
+            return pyro.sample("obs", dist.Normal(mean[:len(cloud_covers)], sigma), obs=cloud_covers)
+    else:
+        with pyro.plate("data", len(time)):
+            return pyro.sample("obs", dist.Normal(mean, sigma))
+
+def effectuer_inference_et_prediction(model, data, time, future_steps=30):
+    """
+    Perform inference and prediction with proper shape handling
+    """
+    # Initial inference
+    nuts_kernel = NUTS(model)
+    mcmc = MCMC(nuts_kernel, num_samples=1000, warmup_steps=200)
+    mcmc.run(time[:len(data)], data)
+    samples = mcmc.get_samples()
+    
+    # Create prediction time points
+    full_time = torch.arange(len(data) + future_steps, dtype=torch.float32)
+    
+    # Make predictions
+    predictive = Predictive(model, samples)
+    predictions = predictive(full_time, None)
+    
+    return predictions
+
+def afficher_resultats(time, data, predictions, title, ylabel):
+    plt.figure(figsize=(10, 6))
+    plt.plot(time.numpy(), data.numpy(), 'o', label='Données observées')
+    plt.plot(torch.arange(len(data) + 30).numpy(), predictions["obs"].mean(axis=0).numpy(), label='Prédictions')
+    plt.fill_between(torch.arange(len(data) + 30).numpy(),
+                     predictions["obs"].mean(axis=0).numpy() - predictions["obs"].std(axis=0).numpy(),
+                     predictions["obs"].mean(axis=0).numpy() + predictions["obs"].std(axis=0).numpy(),
+                     alpha=0.5, label='Intervalle de confiance')
+    plt.xlabel('Temps')
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.legend()
+    plt.show()
 
 def filtrer_donnees_mois_precedent(donnees_historiques):
     timestamps = donnees_historiques[0]['hourly']['time']
@@ -371,9 +500,27 @@ def get_current_datetime():
 
 # Programme principal
 if __name__ == "__main__":
-    
-    subprocess.run(['python', 'historique_donnees.py'], check=True)  # Exécution du script et attente de la fin
-    current_datetime=get_current_datetime()
+    subprocess.run(['python', 'historique_donnees.py'], check=True)
+    current_datetime = get_current_datetime()
+    donnees_historiques = charger_donnees_historiques()
+    if donnees_historiques is None:
+        print("Aucune donnée historique trouvée. Arrêt du programme.")
+        exit(1)
+
+    temperatures, cloud_covers, sunrise, sunset, time_temperatures, time_sunrise, time_sunset = donnee_entrainement(donnees_historiques)
+
+    # Effectuer l'inférence et les prédictions pour chaque variable
+    predictions_sunrise = effectuer_inference_et_prediction(model_sunrise_sinusoidal, sunrise, time_sunrise)
+    predictions_sunset = effectuer_inference_et_prediction(model_sunset_sinusoidal, sunset, time_sunset)
+    #predictions_temperature = effectuer_inference_et_prediction(model_temperature_seasonal, temperatures, time_temperatures)
+    #predictions_cloud_covers = effectuer_inference_et_prediction(model_cloud_covers, cloud_covers, time_temperatures)
+
+    # Afficher les résultats pour chaque variable
+    afficher_resultats(time_sunrise, sunrise, predictions_sunrise, 'Prédictions de l\'heure de lever du soleil avec Régression Linéaire Bayésienne', 'Heure de lever du soleil')
+    afficher_resultats(time_sunset, sunset, predictions_sunset, 'Prédictions de l\'heure de coucher du soleil avec Régression Linéaire Bayésienne', 'Heure de coucher du soleil')
+    #afficher_resultats(time_temperatures, temperatures, predictions_temperature, 'Prédictions de température avec Régression Linéaire Bayésienne', 'Température (°C)')
+    #afficher_resultats(time_temperatures, cloud_covers, predictions_cloud_covers, 'Prédictions de la couverture nuageuse avec Régression Linéaire Bayésienne', 'Couverture nuageuse (%)')
+
     # Obtenir les données météorologiques actuelles
     data_meteo_actuelles_hourly = obtenir_donnees_meteo_actuelles_hourly(current_datetime)
     print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_hourly))
@@ -384,7 +531,7 @@ if __name__ == "__main__":
         print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_daily))
         print("Contenu de data_meteo_actuelles:", data_meteo_actuelles_daily)
         mettre_a_jour_historique_daily(data_meteo_actuelles_daily)
-  
+    
 
     # Calculer l'ensoleillement et la température actuels
     ensoleillement_actuel, temperature_actuelle = calculer_ensoleillement_et_temperature(data_meteo_actuelles_hourly)
@@ -409,11 +556,12 @@ if __name__ == "__main__":
     # Afficher le graphique de la production d'électricité
     afficher_graphique()
     
-    donnees_historiques = charger_donnees_historiques()
+    
     if donnees_historiques:
         filtered_timestamps, filtered_temperatures, filtered_cloud_covers = filtrer_donnees_mois_precedent(donnees_historiques)
         production_quotidienne = calculer_production_quotidienne(filtered_timestamps, filtered_temperatures, filtered_cloud_covers)
         afficher_graphique_quotidien(production_quotidienne)
+    
 
 #stocker les nouvelles valeurs dans un json hourly et daily
 #afficher un graphe de ce qui a ete produit jusqu'a present

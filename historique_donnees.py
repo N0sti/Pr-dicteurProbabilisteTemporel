@@ -51,11 +51,11 @@ def stocker_donnees_historiques(data, fichier):
 
 if __name__ == "__main__":
     end_time = int(datetime.datetime.now().timestamp())  # Timestamp actuel (fin de la période)
-    start_time = end_time - 1 * 365 * 24 * 3600  # 1 an en secondes (début de la période)
+    start_time = end_time - 3 * 365 * 24 * 3600  # 3 an en secondes (début de la période)
     print("start_time:", start_time)
     print("end_time:", end_time)
 
-    # Récupérer toutes les données pour les deux dernières années
+    # Récupérer toutes les données pour les 3 dernières années
     donnees_historiques = obtenir_donnees_historiques(start_time, end_time)
 
     # Stocker les données dans un fichier JSON

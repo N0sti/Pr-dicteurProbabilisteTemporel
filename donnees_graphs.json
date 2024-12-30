@@ -1,74 +1,14 @@
 [
     {
         "energie_produite": 0.0,
-        "timestamp": "29/12/2024 14:00:00"
+        "timestamp": "30/12/2024 00:00:00"
     },
     {
         "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
+        "timestamp": "30/12/2024 02:00:00"
     },
     {
         "energie_produite": 0.0,
-        "timestamp": "29/12/2024 14:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 15:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 16:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 16:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 16:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 16:00:00"
-    },
-    {
-        "energie_produite": 0.0,
-        "timestamp": "29/12/2024 16:00:00"
+        "timestamp": "30/12/2024 02:00:00"
     }
 ]
