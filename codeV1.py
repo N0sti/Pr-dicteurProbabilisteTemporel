@@ -698,6 +698,7 @@ def calculer_production_quotidienne(filtered_timestamps, filtered_temperatures, 
 
 # Fonction pour afficher un graphique de la production d'électricité
 def afficher_graphique(predictions_future=None):
+    file_path="graphique.png"
     try:
         with open('donnees_graphs.json', 'r') as fichier:
             donnees = json.load(fichier)
@@ -749,7 +750,11 @@ def afficher_graphique(predictions_future=None):
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.legend()
     plt.tight_layout()
+    # Enregistrement du graphique
+    plt.savefig(file_path)  # Remplace automatiquement l'image existante
+    plt.close()  # Ferme la figure pour libérer de la mémoire
     plt.show()
+    
 
 def get_current_datetime():
     # Obtenez la date et l'heure actuelle
