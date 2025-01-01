@@ -696,46 +696,8 @@ def calculer_production_quotidienne(filtered_timestamps, filtered_temperatures, 
 
     return production_quotidienne
 
-def afficher_graphique_quotidien(production_quotidienne):
-    dates = list(production_quotidienne.keys())
-    production = list(production_quotidienne.values())
-
-    # Formater les dates au format 30/09/2024
-    formatted_dates = [datetime.strptime(date, '%Y-%m-%d').strftime('%d/%m/%Y') for date in dates]
-    #print("formatted_dates", formatted_dates)
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(formatted_dates, production, marker='o', linestyle='-', color='blue', label='Énergie produite')
-    plt.xlabel('Date')
-    plt.ylabel('Énergie produite (kWh)')
-    plt.title('Production d\'électricité quotidienne')
-    plt.xticks(rotation=45, fontsize=8)
-    plt.yticks(fontsize=10)
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-    timestamps = donnees_historiques[0]['hourly']['time']
-    temperatures = donnees_historiques[0]['hourly']['temperature_2m']
-    cloud_covers = donnees_historiques[0]['hourly']['cloud_cover']
-
-    production_mensuelle = []
-
-    for i in range(len(timestamps)):
-        temperature_actuelle = temperatures[i]
-        cloud_cover = cloud_covers[i]
-        ensoleillement_actuel = (100 - cloud_cover) / 100
-        energie_produite = predire_production_electricite(
-            puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
-            efficacite_panneaux, ensoleillement_actuel, inclinaison_panneaux,
-            orientation_panneaux, facteur_de_performance, temperature_actuelle)
-        production_mensuelle.append(energie_produite)
-    print("production_mensuelle", production_mensuelle)
-
-    return timestamps, production_mensuelle
 # Fonction pour afficher un graphique de la production d'électricité
-def afficher_graphique():
+def afficher_graphique(predictions_future=None):
     try:
         with open('donnees_graphs.json', 'r') as fichier:
             donnees = json.load(fichier)
@@ -747,61 +709,43 @@ def afficher_graphique():
         print("Le fichier JSON ne contient aucune donnée.")
         return
 
+    # Historical data
     timestamps = []
     energie_produite = []
-
+    
     for entry in donnees:
         if 'timestamp' in entry and 'energie_produite' in entry:
-            timestamps.append(entry['timestamp'])
+            timestamps.append(datetime.strptime(entry['timestamp'], '%d/%m/%Y %H:%M:%S'))
             energie_produite.append(entry['energie_produite'])
 
-    if not timestamps or not energie_produite:
-        print("Aucune donnée valide à afficher.")
-        return
+    # Future predictions
+    future_timestamps = []
+    future_energie = []
+    
+    if predictions_future:
+        for timestamp_str, energy in predictions_future:
+            future_timestamps.append(datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S'))
+            future_energie.append(energy)
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(timestamps, energie_produite, marker='o', linestyle='-', color='blue', label='Énergie produite')
+    plt.figure(figsize=(12, 7))
+    
+    # Plot historical data
+    plt.plot(timestamps, energie_produite, marker='o', linestyle='-', color='blue', 
+             label='Production historique', markersize=4)
+    
+    # Plot future predictions
+    if predictions_future:
+        plt.plot(future_timestamps, future_energie, marker='o', linestyle='--', color='red',
+                label='Prévisions', markersize=4)
+
     plt.xlabel('Temps')
     plt.ylabel('Énergie produite (kWh)')
-    plt.title('Production d\'électricité au fil du temps')
-    plt.xticks(rotation=45, fontsize=8)
-    plt.yticks(fontsize=10)
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-    try:
-        with open('donnees_historiques.json', 'r') as fichier:
-            donnees = json.load(fichier)
-    except (FileNotFoundError, json.JSONDecodeError):
-        print("Aucune donnée valide trouvée pour afficher le graphique.")
-        return
-
-    if not donnees:
-        print("Le fichier JSON ne contient aucune donnée.")
-        return
-
-    # Liste des timestamps et énergies produites
-    timestamps = []
-    energie_produite = []
-
-    # Ajouter une vérification pour garantir que 'timestamp' et 'energie_produite' existent dans chaque entrée
-    for entry in donnees:
-        if 'timestamp' in entry and 'energie_produite' in entry:
-            timestamps.append(entry['timestamp'])
-            energie_produite.append(entry['energie_produite'])
-
-    if not timestamps or not energie_produite:
-        print("Aucune donnée valide à afficher.")
-        return
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(timestamps, energie_produite, marker='o', linestyle='-', color='blue', label='Énergie produite')
-    plt.xlabel('Temps')
-    plt.ylabel('Énergie produite (kWh)')
-    plt.title('Production d\'électricité au fil du temps')
-    plt.xticks(rotation=45, fontsize=8)
-    plt.yticks(fontsize=10)
+    plt.title('Production d\'électricité - Historique et Prévisions')
+    
+    # Format x-axis
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y %H:%M'))
+    plt.gcf().autofmt_xdate()  # Rotate and align the tick labels
+    
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.legend()
     plt.tight_layout()
@@ -862,6 +806,63 @@ def afficher_resultats_prophet(df, forecast):
     plt.tight_layout()
     plt.show()
 
+# Fonction pour prédire la production d'électricité future
+def predire_production_electricite_future(durations, temperatures_futures):
+    predictions_future = []
+    for duration, temperature in zip(durations, temperatures_futures):
+        # Convertir la durée en heures
+        duration_hours = duration / 3600
+        # Supposer un ensoleillement de 100%
+        ensoleillement_futur = 1.0
+        # Prédire la production d'électricité pour chaque jour
+        energie_produite_future = predire_production_electricite(
+            puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
+            efficacite_panneaux, ensoleillement_futur, inclinaison_panneaux,
+            orientation_panneaux, facteur_de_performance, temperature) * duration_hours
+        predictions_future.append(energie_produite_future)
+    return predictions_future
+
+# Fonction pour afficher les prédictions futures
+def afficher_previsions_future(predictions_future, prediction_dates):
+    plt.figure(figsize=(10, 6))
+    plt.plot(prediction_dates, predictions_future, marker='o', linestyle='-', color='blue', label='Prévisions futures')
+    plt.xlabel('Date')
+    plt.ylabel('Énergie prévue (kWh)')
+    plt.title('Prévisions de production d\'électricité future')
+    plt.xticks(rotation=45, fontsize=8)
+    plt.yticks(fontsize=10)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def predire_production_electricite_heure_par_heure(future_temperatures_list, prediction_dates_sunrise, prediction_times_sunrise, prediction_dates_sunset, prediction_times_sunset):
+    predictions_future = []
+
+    for i in range(len(future_temperatures_list)):
+        timestamp, temperature = future_temperatures_list[i]
+        # Convertir le Timestamp en string formaté
+        date_str = timestamp.strftime('%Y-%m-%d')
+        time_str = timestamp.strftime('%H:%M:%S')
+        
+        date = datetime.strptime(date_str, '%Y-%m-%d')
+        time = datetime.strptime(time_str, '%H:%M:%S').time()
+
+        # Déterminer l'ensoleillement
+        sunrise_time = datetime.strptime(prediction_times_sunrise[i // 24], '%H:%M').time()
+        sunset_time = datetime.strptime(prediction_times_sunset[i // 24], '%H:%M').time()
+
+        ensoleillement_futur = 1.0 if sunrise_time <= time <= sunset_time else 0.0
+
+        energie_produite_future = predire_production_electricite(
+            puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
+            efficacite_panneaux, ensoleillement_futur, inclinaison_panneaux,
+            orientation_panneaux, facteur_de_performance, temperature)
+
+        predictions_future.append((f"{date_str} {time_str}", energie_produite_future))
+
+    return predictions_future
+ 
 # Programme principal
 if __name__ == "__main__":
     subprocess.run(['python', 'historique_donnees.py'], check=True)
@@ -892,7 +893,8 @@ if __name__ == "__main__":
     prediction_dates_sunrise, prediction_times_sunrise, mean_predictions_sunrise, std_predictions_sunrise = predict_next_three_days_sunrise(time_sunrise, sunrise, current_datetime)
      # Obtenir les prédictions pour les trois prochains jours
     prediction_dates_sunset, prediction_times_sunset, mean_predictions_sunset, std_predictions_sunset = predict_next_three_days_sunset(time_sunset, sunset, current_datetime)
-
+    print("prediction_dates_sunset", prediction_dates_sunset, "prediction_times_sunset", prediction_times_sunset, "mean_predictions_sunset", mean_predictions_sunset, "std_predictions_sunset", std_predictions_sunset)
+    print("prediction_dates_sunrise", prediction_dates_sunrise, "prediction_times_sunrise", prediction_times_sunrise, "mean_predictions_sunrise", mean_predictions_sunrise, "std_predictions_sunrise", std_predictions_sunrise)
     # Afficher les prédictions avec les intervalles de confiance
     print("\nPrédictions du lever du soleil pour les trois prochains jours:")
     print("=" * 70)
@@ -931,7 +933,12 @@ if __name__ == "__main__":
     print("forecast", forecast)
     afficher_resultats_prophet(df, forecast)
     sleep(50000)
+    # Extraire les prédictions de température pour les trois prochains jours
+    future_temperatures = forecast[['ds', 'yhat']].tail(3*24)
+    future_temperatures_list = future_temperatures.values.tolist()
+    print("future_temperatures_list", future_temperatures_list)
 
+    
     # Obtenir les données météorologiques actuelles
     data_meteo_actuelles_hourly = obtenir_donnees_meteo_actuelles_hourly(current_datetime)
     #print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_hourly))
@@ -965,14 +972,11 @@ if __name__ == "__main__":
     print(f"Température actuelle: {temperature_actuelle}°C")
     print(f"Énergie produite actuelle: {energie_produite:.2f} kWh")
     print(f"Timestamp: {current_datetime}")
+    
+    # Prédire la production d'électricité heure par heure pour les trois prochains jours
+    predictions_future = predire_production_electricite_heure_par_heure(future_temperatures_list, prediction_dates_sunrise, prediction_times_sunrise, prediction_dates_sunset, prediction_times_sunset)
     # Afficher le graphique de la production d'électricité
-    afficher_graphique()
-    
-    
-    if donnees_historiques:
-        filtered_timestamps, filtered_temperatures, filtered_cloud_covers = filtrer_donnees_mois_precedent(donnees_historiques)
-        production_quotidienne = calculer_production_quotidienne(filtered_timestamps, filtered_temperatures, filtered_cloud_covers)
-        afficher_graphique_quotidien(production_quotidienne)
+    afficher_graphique(predictions_future)
 # Afficher la durée d'ensoleillement pour les trois prochains jours
 #stocker les nouvelles valeurs dans un json hourly et daily
 #afficher un graphe de ce qui a ete produit jusqu'a present
