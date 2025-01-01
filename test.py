@@ -1,69 +1,51 @@
+from prophet import Prophet
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from statsmodels.tsa.statespace.sarimax import SARIMAX
-from sklearn.metrics import mean_squared_error
+import json
 
-# Charger les données
-data = pd.read_json("donnees_historiques.json")
+# Fonction pour charger les données historiques
+def charger_donnees_historiques():
+    try:
+        with open('donnees_historiques.json', 'r') as fichier:
+            donnees = json.load(fichier)
+    except (FileNotFoundError, json.JSONDecodeError):
+        print("Aucune donnée valide trouvée pour afficher le graphique.")
+        return None
+    return donnees
 
-# Assurez-vous que les données ont un horodatage et sont bien triées
-data['timestamp'] = pd.to_datetime(data['timestamp'])
-data = data.sort_values('timestamp')
-data.set_index('timestamp', inplace=True)
+# Fonction pour préparer les données pour Prophet
+def preparer_donnees_prophet(donnees_historiques):
+    timestamps = donnees_historiques[0]['hourly']['time']
+    temperatures = donnees_historiques[0]['hourly']['temperature_2m']
+    df = pd.DataFrame({'ds': pd.to_datetime(timestamps), 'y': temperatures})
+    return df
 
-# Extraire les températures et travailler sur les deux dernières années
-temperature_series = data['temperature']
-temperature_last_two_years = temperature_series.loc[data.index[-2 * 365 * 24:]]
+# Fonction pour entraîner le modèle Prophet et faire des prédictions
+def entrainer_et_predire_prophet(df, future_steps=3*365*24):
+    model = Prophet()
+    model.fit(df)
+    future = model.make_future_dataframe(periods=future_steps, freq='h')
+    forecast = model.predict(future)
+    return forecast
 
-# Identifier les paramètres SARIMA : ces valeurs peuvent être ajustées
-p, d, q = 1, 1, 1
-P, D, Q, m = 1, 1, 1, 24  # m=24 car les données sont horaires avec saisonnalité quotidienne
+# Fonction pour afficher les résultats
+def afficher_resultats_prophet(df, forecast):
+    plt.figure(figsize=(12, 7))
+    plt.plot(df['ds'], df['y'], label='Données observées')
+    plt.plot(forecast['ds'], forecast['yhat'], label='Prédictions', color='orange')
+    plt.xlabel('Temps')
+    plt.ylabel('Température (°C)')
+    plt.title('Prédictions de température pour les trois prochaines années')
+    plt.legend()
+    plt.show()
 
-# Ajuster le modèle SARIMA
-model = SARIMAX(temperature_last_two_years, 
-                order=(p, d, q), 
-                seasonal_order=(P, D, Q, m),
-                enforce_stationarity=False, 
-                enforce_invertibility=False)
-results = model.fit()
+# Programme principal
+if __name__ == "__main__":
+    donnees_historiques = charger_donnees_historiques()
+    if donnees_historiques is None:
+        print("Aucune donnée historique trouvée. Arrêt du programme.")
+        exit(1)
 
-# Prédictions pour les deux dernières années
-start_date = temperature_last_two_years.index[0]
-end_date = temperature_last_two_years.index[-1]
-predictions = results.predict(start=start_date, end=end_date)
-
-# Prédictions pour les 3 prochains jours (72 heures)
-forecast = results.get_forecast(steps=72)
-forecast_mean = forecast.predicted_mean
-confidence_intervals = forecast.conf_int()
-
-# Évaluer la précision sur les deux dernières années
-rmse = np.sqrt(mean_squared_error(temperature_last_two_years, predictions))
-print(f"RMSE sur les deux dernières années : {rmse:.2f}")
-
-# Tracer les résultats
-plt.figure(figsize=(12, 6))
-
-# Données observées
-plt.plot(temperature_last_two_years, label="Données observées", color='blue')
-
-# Prédictions SARIMA
-plt.plot(predictions, label="Prédictions (2 dernières années)", color='orange')
-
-# Prévisions futures (3 jours)
-future_dates = pd.date_range(start=temperature_last_two_years.index[-1], periods=73, freq='H')[1:]
-plt.plot(future_dates, forecast_mean, label="Prédictions futures (3 jours)", color='green')
-
-# Intervalle de confiance
-plt.fill_between(future_dates, 
-                 confidence_intervals.iloc[:, 0], 
-                 confidence_intervals.iloc[:, 1], 
-                 color='green', alpha=0.2, label="Intervalle de confiance")
-
-# Mise en forme
-plt.title("Prédictions de température avec SARIMA")
-plt.xlabel("Temps")
-plt.ylabel("Température (°C)")
-plt.legend()
-plt.show()
+    df = preparer_donnees_prophet(donnees_historiques)
+    forecast = entrainer_et_predire_prophet(df)
+    afficher_resultats_prophet(df, forecast)

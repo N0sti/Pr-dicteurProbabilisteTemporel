@@ -826,7 +826,7 @@ if __name__ == "__main__":
     # Effectuer l'inférence et les prédictions pour chaque variable
     #predictions_sunrise = effectuer_inference_et_prediction(model_sunrise_sinusoidal, sunrise, time_sunrise)
     #predictions_sunset = effectuer_inference_et_prediction(model_sunset_sinusoidal, sunset, time_sunset)
-     # Obtenir et afficher les prédictions
+    # Obtenir et afficher les prédictions
     prediction_results_sunrise = predict_and_display_sunrise(time_sunrise, sunrise, current_datetime)
     prediction_results_sunset = predict_and_display_sunset(time_sunset, sunset, current_datetime)
     
@@ -877,6 +877,7 @@ if __name__ == "__main__":
     data_meteo_actuelles_hourly = obtenir_donnees_meteo_actuelles_hourly(current_datetime)
     #print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_hourly))
     #print("Contenu de data_meteo_actuelles:", data_meteo_actuelles_hourly)
+    
     mettre_a_jour_historique_hourly(data_meteo_actuelles_hourly)
     if current_datetime.hour==23: #mettre a jour avec les donnée de la journée
         data_meteo_actuelles_daily = obtenir_donnees_meteo_actuelles_daily(current_datetime)
