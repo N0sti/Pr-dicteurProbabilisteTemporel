@@ -12,7 +12,11 @@ from pyro.infer import MCMC, NUTS
 from pyro.infer import Predictive
 import torch
 import numpy as np
-
+from prophet import Prophet
+import pandas as pd
+import matplotlib.pyplot as plt
+import json
+import matplotlib.dates as mdates
 
 # Paramètres d'entrée
 puissance_nominale_par_panneau = 300  # Wc
@@ -812,6 +816,52 @@ def get_current_datetime():
     print("current_datetime:", current_datetime)
     return current_datetime # Retourne la date et l'heure actuelles
 
+# Fonction pour préparer les données pour Prophet
+def preparer_donnees_prophet(donnees_historiques):
+    timestamps = donnees_historiques[0]['hourly']['time']
+    temperatures = donnees_historiques[0]['hourly']['temperature_2m']
+    df = pd.DataFrame({'ds': pd.to_datetime(timestamps), 'y': temperatures})
+    return df
+
+# Fonction pour entraîner le modèle Prophet et faire des prédictions
+def entrainer_et_predire_prophet(df, future_steps=3*24):
+    model = Prophet()
+    model.fit(df)
+    future = model.make_future_dataframe(periods=future_steps, freq='h')
+    forecast = model.predict(future)
+    return forecast
+
+# Fonction pour afficher les résultats
+def afficher_resultats_prophet(df, forecast):
+    plt.figure(figsize=(12, 7))
+    
+    # Données et prédictions
+    plt.plot(df['ds'], df['y'], label='Données observées')
+    plt.plot(forecast['ds'], forecast['yhat'], label='Prédictions', color='orange')
+    
+    # Configuration des grilles
+    plt.grid(True, which='both', axis='both')
+    
+    # Configuration de l'axe x
+    plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%Y'))
+    plt.gca().xaxis.set_minor_locator(mdates.DayLocator())
+    
+    # Configuration de l'axe y
+    plt.gca().yaxis.set_major_locator(plt.MultipleLocator(5))
+    
+    # Labels et titre
+    plt.xlabel('Temps')
+    plt.ylabel('Température (°C)')
+    plt.title('Prédictions de température pour les trois prochaines années')
+    plt.legend()
+    
+    # Rotation des labels de l'axe x
+    plt.xticks(rotation=45)
+    
+    plt.tight_layout()
+    plt.show()
+
 # Programme principal
 if __name__ == "__main__":
     subprocess.run(['python', 'historique_donnees.py'], check=True)
@@ -872,7 +922,16 @@ if __name__ == "__main__":
         # Afficher la durée
         print(f"Date: {sunrise_date} - Durée prévue: {duration}")
     print("durations", durations)
+    #sleep(50000)
+
+    df = preparer_donnees_prophet(donnees_historiques)
+    forecast = entrainer_et_predire_prophet(df)
+    print(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail())
+    print("forecast.columns", forecast.columns)
+    print("forecast", forecast)
+    afficher_resultats_prophet(df, forecast)
     sleep(50000)
+
     # Obtenir les données météorologiques actuelles
     data_meteo_actuelles_hourly = obtenir_donnees_meteo_actuelles_hourly(current_datetime)
     #print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_hourly))
