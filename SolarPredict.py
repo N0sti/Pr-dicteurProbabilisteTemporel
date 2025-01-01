@@ -2,21 +2,19 @@ from asyncio import sleep
 import os
 import subprocess
 import requests
+import json
 import datetime
 from datetime import datetime, timedelta
-import json
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import numpy as np
+import torch
+import pandas as pd
+from prophet import Prophet
 import pyro
 import pyro.distributions as dist
-from pyro.infer import MCMC, NUTS
-from pyro.infer import Predictive
-import torch
-import numpy as np
-from prophet import Prophet
-import pandas as pd
-import matplotlib.pyplot as plt
-import json
-import matplotlib.dates as mdates
+from pyro.infer import MCMC, NUTS, Predictive
+
 
 # Paramètres d'entrée
 puissance_nominale_par_panneau = 300  # Wc
@@ -234,115 +232,6 @@ def model_sunset_sinusoidal(time, sunset):
     else:
         with pyro.plate("data", len(time)):
             return pyro.sample("obs", dist.Normal(mean, sigma))
-
-def model_temperature_seasonal(time, temperatures):
-    a = pyro.sample("a", dist.Normal(0., 10.))
-    b = pyro.sample("b", dist.Normal(0., 10.))
-    c = pyro.sample("c", dist.Normal(0., 10.))
-    sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
-
-    mean = a + b * time + c * torch.sin(2 * np.pi * time / 365)
-
-    if temperatures is not None:
-        with pyro.plate("data", len(temperatures)):
-            return pyro.sample("obs", dist.Normal(mean[:len(temperatures)], sigma), obs=temperatures)
-    else:
-        with pyro.plate("data", len(time)):
-            return pyro.sample("obs", dist.Normal(mean, sigma))
-
-def model_cloud_covers(time, cloud_covers):
-    """
-    Bayesian linear regression model for cloud cover predictions
-    """
-    a = pyro.sample("a", dist.Normal(0., 10.))
-    b = pyro.sample("b", dist.Normal(0., 10.))
-    sigma = pyro.sample("sigma", dist.Uniform(0., 10.))
-    
-    mean = a + b * time
-    
-    if cloud_covers is not None:
-        with pyro.plate("data", len(cloud_covers)):
-            return pyro.sample("obs", dist.Normal(mean[:len(cloud_covers)], sigma), obs=cloud_covers)
-    else:
-        with pyro.plate("data", len(time)):
-            return pyro.sample("obs", dist.Normal(mean, sigma))
-
-def effectuer_inference_et_prediction(model, data, time, future_steps=30):
-    """
-    Perform inference and prediction with proper shape handling
-    """
-    # Initial inference
-    nuts_kernel = NUTS(model)
-    mcmc = MCMC(nuts_kernel, num_samples=1000, warmup_steps=200)
-    mcmc.run(time[:len(data)], data)
-    samples = mcmc.get_samples()
-    
-    # Create prediction time points
-    full_time = torch.arange(len(data) + future_steps, dtype=torch.float32)
-    
-    # Make predictions
-    predictive = Predictive(model, samples)
-    predictions = predictive(full_time, None)
-    
-    return predictions
-
-def afficher_resultats(time, data, predictions, title, ylabel):
-    plt.figure(figsize=(12, 7))
-    
-    # Plot the data and predictions
-    plt.plot(time.numpy(), data.numpy(), 'o', label='Données observées', markersize=4)
-    plt.plot(torch.arange(len(data) + 30).numpy(), 
-            predictions["obs"].mean(axis=0).numpy(), 
-            label='Prédictions', 
-            linewidth=2)
-    
-    # Add confidence interval
-    plt.fill_between(torch.arange(len(data) + 30).numpy(),
-                     predictions["obs"].mean(axis=0).numpy() - predictions["obs"].std(axis=0).numpy(),
-                     predictions["obs"].mean(axis=0).numpy() + predictions["obs"].std(axis=0).numpy(),
-                     alpha=0.3, 
-                     label='Intervalle de confiance')
-    
-    # Configure y-axis (time of day)
-    hours = np.arange(4, 23, 0.25)  # From 4:00 to 22:00 with 15-min intervals
-    plt.yticks(hours, [f"{int(h):02d}:{int((h % 1) * 60):02d}" for h in hours])
-    
-    # Configure x-axis with month labels and daily grid
-    num_points = len(data) + 30
-    
-    # Create month labels at regular intervals
-    x_ticks_months = np.linspace(0, num_points-1, 6)  # Show 6 month labels
-    current_date = datetime.now()
-    start_date = current_date - timedelta(days=len(data))
-    x_labels = [(start_date + timedelta(days=int(x))).strftime('%m/%Y') for x in x_ticks_months]
-    
-    # Set monthly labels
-    plt.xticks(x_ticks_months, x_labels, rotation=45)
-    
-    # Create daily grid lines
-    x_ticks_days = np.arange(0, num_points, 1)  # One tick per day
-    
-    # Add grid
-    # Major grid for hours (horizontal lines)
-    plt.grid(True, which='major', axis='y', linestyle='-', alpha=0.3)
-    
-    # Add vertical lines for each day
-    for x in x_ticks_days:
-        plt.axvline(x=x, color='gray', linestyle='-', alpha=0.1)
-    
-    # Add finer grid for 15-minute intervals
-    plt.grid(True, which='minor', axis='y', linestyle=':', alpha=0.2)
-    
-    # Labels and title
-    plt.xlabel('Mois')
-    plt.ylabel(ylabel)
-    plt.title(title)
-    
-    # Adjust layout and legend
-    plt.legend(loc='best')
-    plt.tight_layout()
-    
-    plt.show()
 
 def predict_next_three_days_sunrise(time_sunrise, sunrise, current_datetime):
     """
@@ -614,27 +503,14 @@ def predict_and_display_sunset(time_sunset, sunset, current_datetime):
 
     return prediction_results
 
-def filtrer_donnees_mois_precedent(donnees_historiques):
-    timestamps = donnees_historiques[0]['hourly']['time']
-    temperatures = donnees_historiques[0]['hourly']['temperature_2m']
-    cloud_covers = donnees_historiques[0]['hourly']['cloud_cover']
-
-    # Calculer la date du premier jour du mois précédent
-    today = datetime.now()
-    first_day_of_previous_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
-
-    filtered_timestamps = []
-    filtered_temperatures = []
-    filtered_cloud_covers = []
-
-    for i in range(len(timestamps)):
-        timestamp = datetime.strptime(timestamps[i], '%Y-%m-%dT%H:%M')
-        if timestamp >= first_day_of_previous_month:
-            filtered_timestamps.append(timestamps[i])
-            filtered_temperatures.append(temperatures[i])
-            filtered_cloud_covers.append(cloud_covers[i])
-
-    return filtered_timestamps, filtered_temperatures, filtered_cloud_covers
+def charger_donnees_historiques():
+    try:
+        with open('donnees_historiques.json', 'r') as fichier:
+            donnees = json.load(fichier)
+    except (FileNotFoundError, json.JSONDecodeError):
+        print("Aucune donnée valide trouvée pour afficher le graphique.")
+        return None
+    return donnees
 
 # Fonction pour stocker les nouvelles valeurs dans un fichier JSON dans le fichier historique
 def stocker_donnees_json(energie_produite, current_datetime ):
@@ -655,46 +531,6 @@ def stocker_donnees_json(energie_produite, current_datetime ):
         json.dump(donnees_existantes, f, indent=4)
 
     #print(f"Nouvelle donnée ajoutée: {donnees}")
-
-def charger_donnees_historiques():
-    try:
-        with open('donnees_historiques.json', 'r') as fichier:
-            donnees = json.load(fichier)
-    except (FileNotFoundError, json.JSONDecodeError):
-        print("Aucune donnée valide trouvée pour afficher le graphique.")
-        return None
-    return donnees
-
-def calculer_production_quotidienne(filtered_timestamps, filtered_temperatures, filtered_cloud_covers):
-    production_quotidienne = {}
-    current_date = None
-    daily_production = 0
-
-    for i in range(len(filtered_timestamps)):
-        timestamp = filtered_timestamps[i]
-        date = timestamp.split('T')[0]
-        temperature_actuelle = filtered_temperatures[i]
-        cloud_cover = filtered_cloud_covers[i]
-        ensoleillement_actuel = (100 - cloud_cover) / 100
-        energie_produite = predire_production_electricite(
-            puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
-            efficacite_panneaux, ensoleillement_actuel, inclinaison_panneaux,
-            orientation_panneaux, facteur_de_performance, temperature_actuelle)
-
-        if current_date is None:
-            current_date = date
-
-        if date == current_date:
-            daily_production += energie_produite
-        else:
-            production_quotidienne[current_date] = daily_production
-            current_date = date
-            daily_production = energie_produite
-
-    if current_date:
-        production_quotidienne[current_date] = daily_production
-
-    return production_quotidienne
 
 # Fonction pour afficher un graphique de la production d'électricité
 def afficher_graphique(predictions_future=None):
@@ -754,7 +590,6 @@ def afficher_graphique(predictions_future=None):
     plt.savefig(file_path)  # Remplace automatiquement l'image existante
     plt.close()  # Ferme la figure pour libérer de la mémoire
     plt.show()
-    
 
 def get_current_datetime():
     # Obtenez la date et l'heure actuelle
@@ -811,36 +646,6 @@ def afficher_resultats_prophet(df, forecast):
     plt.tight_layout()
     plt.show()
 
-# Fonction pour prédire la production d'électricité future
-def predire_production_electricite_future(durations, temperatures_futures):
-    predictions_future = []
-    for duration, temperature in zip(durations, temperatures_futures):
-        # Convertir la durée en heures
-        duration_hours = duration / 3600
-        # Supposer un ensoleillement de 100%
-        ensoleillement_futur = 1.0
-        # Prédire la production d'électricité pour chaque jour
-        energie_produite_future = predire_production_electricite(
-            puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
-            efficacite_panneaux, ensoleillement_futur, inclinaison_panneaux,
-            orientation_panneaux, facteur_de_performance, temperature) * duration_hours
-        predictions_future.append(energie_produite_future)
-    return predictions_future
-
-# Fonction pour afficher les prédictions futures
-def afficher_previsions_future(predictions_future, prediction_dates):
-    plt.figure(figsize=(10, 6))
-    plt.plot(prediction_dates, predictions_future, marker='o', linestyle='-', color='blue', label='Prévisions futures')
-    plt.xlabel('Date')
-    plt.ylabel('Énergie prévue (kWh)')
-    plt.title('Prévisions de production d\'électricité future')
-    plt.xticks(rotation=45, fontsize=8)
-    plt.yticks(fontsize=10)
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
 def predire_production_electricite_heure_par_heure(future_temperatures_list, prediction_dates_sunrise, prediction_times_sunrise, prediction_dates_sunset, prediction_times_sunset):
     predictions_future = []
 
@@ -879,21 +684,10 @@ if __name__ == "__main__":
 
     temperatures, cloud_covers, sunrise, sunset, time_temperatures, time_sunrise, time_sunset = donnee_entrainement(donnees_historiques)
 
-    # Effectuer l'inférence et les prédictions pour chaque variable
-    #predictions_sunrise = effectuer_inference_et_prediction(model_sunrise_sinusoidal, sunrise, time_sunrise)
-    #predictions_sunset = effectuer_inference_et_prediction(model_sunset_sinusoidal, sunset, time_sunset)
-    # Obtenir et afficher les prédictions
+   # Obtenir et afficher les prédictions
     prediction_results_sunrise = predict_and_display_sunrise(time_sunrise, sunrise, current_datetime)
     prediction_results_sunset = predict_and_display_sunset(time_sunset, sunset, current_datetime)
     
-    #predictions_temperature = effectuer_inference_et_prediction(model_temperature_seasonal, temperatures, time_temperatures)
-    #predictions_cloud_covers = effectuer_inference_et_prediction(model_cloud_covers, cloud_covers, time_temperatures)
-
-    # Afficher les résultats pour chaque variable
-    #afficher_resultats(time_sunrise, sunrise, predictions_sunrise, 'Prédictions de l\'heure de lever du soleil avec Régression Linéaire Bayésienne', 'Heure de lever du soleil')
-    #afficher_resultats(time_temperatures, temperatures, predictions_temperature, 'Prédictions de température avec Régression Linéaire Bayésienne', 'Température (°C)')
-    #afficher_resultats(time_temperatures, cloud_covers, predictions_cloud_covers, 'Prédictions de la couverture nuageuse avec Régression Linéaire Bayésienne', 'Couverture nuageuse (%)')
-
     # Obtenir les prédictions pour les trois prochains jours
     prediction_dates_sunrise, prediction_times_sunrise, mean_predictions_sunrise, std_predictions_sunrise = predict_next_three_days_sunrise(time_sunrise, sunrise, current_datetime)
      # Obtenir les prédictions pour les trois prochains jours
@@ -943,17 +737,11 @@ if __name__ == "__main__":
     future_temperatures_list = future_temperatures.values.tolist()
     print("future_temperatures_list", future_temperatures_list)
 
-    
     # Obtenir les données météorologiques actuelles
-    data_meteo_actuelles_hourly = obtenir_donnees_meteo_actuelles_hourly(current_datetime)
-    #print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_hourly))
-    #print("Contenu de data_meteo_actuelles:", data_meteo_actuelles_hourly)
-    
+    data_meteo_actuelles_hourly = obtenir_donnees_meteo_actuelles_hourly(current_datetime)   
     mettre_a_jour_historique_hourly(data_meteo_actuelles_hourly)
     if current_datetime.hour==23: #mettre a jour avec les donnée de la journée
         data_meteo_actuelles_daily = obtenir_donnees_meteo_actuelles_daily(current_datetime)
-        #print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_daily))
-        #print("Contenu de data_meteo_actuelles:", data_meteo_actuelles_daily)
         mettre_a_jour_historique_daily(data_meteo_actuelles_daily)
     
 
@@ -966,11 +754,7 @@ if __name__ == "__main__":
         efficacite_panneaux, ensoleillement_actuel, inclinaison_panneaux,
         orientation_panneaux, facteur_de_performance, temperature_actuelle)
 
-    # Obtenir le timestamp actuel
-    #timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-
     # Stocker les nouvelles valeurs dans un fichier JSON
-    #stocker_donnees_json(energie_produite, timestamp)
     stocker_donnees_json(energie_produite, current_datetime)
     # Afficher les résultats
     print(f"Ensoleillement actuel: {ensoleillement_actuel * 100}%")
