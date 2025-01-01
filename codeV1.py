@@ -51,13 +51,13 @@ def obtenir_donnees_meteo_actuelles_daily(current_datetime):
     response = requests.get(url)
     response.raise_for_status()  # Vérifie les erreurs HTTP
     data = response.json()
-    print("data", data)
+    #print("data", data)
     
     return data
 
 # Fonction pour calculer l'ensoleillement et la température actuels
 def calculer_ensoleillement_et_temperature(data):
-    print(data)  # Débogage pour afficher les données reçues
+    #print(data)  # Débogage pour afficher les données reçues
     
     # Extraire les données horaires
     hourly_data = data.get('hourly', {})
@@ -82,18 +82,18 @@ def calculer_ensoleillement_et_temperature(data):
     return ensoleillement_actuel, temperature_actuelle
 
 def mettre_a_jour_historique_hourly(data):
-    print("testststts", data)
+    #print("testststts", data)
     fichier_historique = 'donnees_historiques.json'
     # Charger le fichier historique
     with open(fichier_historique, 'r') as file:
         historique = json.load(file)
     #print("data", data)
-    print(data['hourly']['time'])
-    print(data['hourly']['temperature_2m'])
-    print(data['hourly']['cloud_cover'])
-    print(data['hourly']['cloud_cover_low'])
-    print(data['hourly']['cloud_cover_mid'])
-    print(data['hourly']['cloud_cover_high'])
+    #print(data['hourly']['time'])
+    #print(data['hourly']['temperature_2m'])
+    #print(data['hourly']['cloud_cover'])
+    #print(data['hourly']['cloud_cover_low'])
+    #print(data['hourly']['cloud_cover_mid'])
+    #print(data['hourly']['cloud_cover_high'])
     # Ajouter les nouvelles données à la section "hourly" de l'historique
     #print("historique",  historique[0]['hourly']['time'])
     for item in data['hourly']['time']:
@@ -120,17 +120,17 @@ def mettre_a_jour_historique_hourly(data):
     print("Historique mis à jour avec succès.")
 
 def mettre_a_jour_historique_daily(data):
-    print("testststts", data)
+    #print("testststts", data)
     fichier_historique = 'donnees_historiques.json'
     # Charger le fichier historique
     with open(fichier_historique, 'r') as file:
         historique = json.load(file)
     #print("data", data)
-    print(data['daily']['time'])
-    print(data['daily']['sunrise'])
-    print(data['daily']['sunset'])
-    print(data['daily']['daylight_duration'])
-    print(data['daily']['sunshine_duration'])
+    #print(data['daily']['time'])
+    #print(data['daily']['sunrise'])
+    #print(data['daily']['sunset'])
+    #print(data['daily']['daylight_duration'])
+    #print(data['daily']['sunshine_duration'])
     # Ajouter les nouvelles données à la section "hourly" de l'historique
     #print("historique",  historique[0]['daily']['time'])
     for item in data['daily']['time']:
@@ -139,7 +139,7 @@ def mettre_a_jour_historique_daily(data):
 
     for item in data['daily']['sunrise']:
         historique[0]['daily']['sunrise'].append(item)
-    print("historique",  historique[0]['daily']['sunrise'])
+    #print("historique",  historique[0]['daily']['sunrise'])
 
     for item in data['daily']['sunset']:
         historique[0]['daily']['sunset'].append(item)
@@ -283,18 +283,332 @@ def effectuer_inference_et_prediction(model, data, time, future_steps=30):
     return predictions
 
 def afficher_resultats(time, data, predictions, title, ylabel):
-    plt.figure(figsize=(10, 6))
-    plt.plot(time.numpy(), data.numpy(), 'o', label='Données observées')
-    plt.plot(torch.arange(len(data) + 30).numpy(), predictions["obs"].mean(axis=0).numpy(), label='Prédictions')
+    plt.figure(figsize=(12, 7))
+    
+    # Plot the data and predictions
+    plt.plot(time.numpy(), data.numpy(), 'o', label='Données observées', markersize=4)
+    plt.plot(torch.arange(len(data) + 30).numpy(), 
+            predictions["obs"].mean(axis=0).numpy(), 
+            label='Prédictions', 
+            linewidth=2)
+    
+    # Add confidence interval
     plt.fill_between(torch.arange(len(data) + 30).numpy(),
                      predictions["obs"].mean(axis=0).numpy() - predictions["obs"].std(axis=0).numpy(),
                      predictions["obs"].mean(axis=0).numpy() + predictions["obs"].std(axis=0).numpy(),
-                     alpha=0.5, label='Intervalle de confiance')
-    plt.xlabel('Temps')
+                     alpha=0.3, 
+                     label='Intervalle de confiance')
+    
+    # Configure y-axis (time of day)
+    hours = np.arange(4, 23, 0.25)  # From 4:00 to 22:00 with 15-min intervals
+    plt.yticks(hours, [f"{int(h):02d}:{int((h % 1) * 60):02d}" for h in hours])
+    
+    # Configure x-axis with month labels and daily grid
+    num_points = len(data) + 30
+    
+    # Create month labels at regular intervals
+    x_ticks_months = np.linspace(0, num_points-1, 6)  # Show 6 month labels
+    current_date = datetime.now()
+    start_date = current_date - timedelta(days=len(data))
+    x_labels = [(start_date + timedelta(days=int(x))).strftime('%m/%Y') for x in x_ticks_months]
+    
+    # Set monthly labels
+    plt.xticks(x_ticks_months, x_labels, rotation=45)
+    
+    # Create daily grid lines
+    x_ticks_days = np.arange(0, num_points, 1)  # One tick per day
+    
+    # Add grid
+    # Major grid for hours (horizontal lines)
+    plt.grid(True, which='major', axis='y', linestyle='-', alpha=0.3)
+    
+    # Add vertical lines for each day
+    for x in x_ticks_days:
+        plt.axvline(x=x, color='gray', linestyle='-', alpha=0.1)
+    
+    # Add finer grid for 15-minute intervals
+    plt.grid(True, which='minor', axis='y', linestyle=':', alpha=0.2)
+    
+    # Labels and title
+    plt.xlabel('Mois')
     plt.ylabel(ylabel)
     plt.title(title)
-    plt.legend()
+    
+    # Adjust layout and legend
+    plt.legend(loc='best')
+    plt.tight_layout()
+    
     plt.show()
+
+def predict_next_three_days_sunrise(time_sunrise, sunrise, current_datetime):
+    """
+    Predict sunrise times for the next three days using the existing sinusoidal model
+    """
+    # Effectuer l'inférence avec le modèle existant
+    nuts_kernel = NUTS(model_sunrise_sinusoidal)
+    mcmc = MCMC(nuts_kernel, num_samples=1000, warmup_steps=200)
+    mcmc.run(time_sunrise, sunrise)
+    samples = mcmc.get_samples()
+
+    # Créer les points temporels pour les trois prochains jours
+    # Comme le modèle utilise une période de 365 jours, nous devons ajuster les valeurs en conséquence
+    current_day_of_year = current_datetime.timetuple().tm_yday
+    next_three_days = torch.tensor([
+        current_day_of_year + 1,
+        current_day_of_year + 2,
+        current_day_of_year + 3
+    ], dtype=torch.float32)
+
+    # Faire les prédictions
+    predictive = Predictive(model_sunrise_sinusoidal, samples)
+    predictions = predictive(next_three_days, None)
+
+    # Convertir les prédictions en heures et minutes
+    prediction_dates = []
+    prediction_times = []
+
+    mean_predictions = predictions["obs"].mean(axis=0)
+    std_predictions = predictions["obs"].std(axis=0)
+
+    for i in range(3):
+        next_date = current_datetime + timedelta(days=i+1)
+        # La prédiction donne l'heure en format décimal (ex: 6.5 pour 6h30)
+        predicted_hour = int(mean_predictions[i].item())
+        predicted_minute = int((mean_predictions[i].item() % 1) * 60)
+
+        prediction_dates.append(next_date.strftime('%Y-%m-%d'))
+        prediction_times.append(f"{predicted_hour:02d}:{predicted_minute:02d}")
+
+    return prediction_dates, prediction_times, mean_predictions, std_predictions
+
+def predict_and_display_sunrise(time_sunrise, sunrise, current_datetime):
+    """
+    Predict sunrise times and ensure consistent display between graph and console
+    """
+    # Effectuer l'inférence et les prédictions comme avant
+    nuts_kernel = NUTS(model_sunrise_sinusoidal)
+    mcmc = MCMC(nuts_kernel, num_samples=1000, warmup_steps=200)
+    mcmc.run(time_sunrise, sunrise)
+    samples = mcmc.get_samples()
+
+    # Créer les points temporels pour le graphique (données historiques + 3 jours)
+    future_steps = 3
+    full_time = torch.arange(len(sunrise) + future_steps, dtype=torch.float32)
+
+    # Faire les prédictions pour tout l'intervalle
+    predictive = Predictive(model_sunrise_sinusoidal, samples)
+    predictions = predictive(full_time, None)
+
+    # Afficher le graphique avec toutes les données
+    plt.figure(figsize=(12, 6))
+    plt.plot(time_sunrise.numpy(), sunrise.numpy(), 'o', label='Données observées', alpha=0.5)
+
+    mean_predictions = predictions["obs"].mean(axis=0)
+    std_predictions = predictions["obs"].std(axis=0)
+
+    plt.plot(full_time.numpy(), mean_predictions.numpy(), 'r-', label='Prédictions')
+    plt.fill_between(
+        full_time.numpy(),
+        (mean_predictions - std_predictions).numpy(),
+        (mean_predictions + std_predictions).numpy(),
+        color='r', alpha=0.2, label='Intervalle de confiance'
+    )
+
+    # Configure y-axis (time of day)
+    hours = np.arange(4, 23, 0.25)  # From 4:00 to 22:00 with 15-min intervals
+    plt.yticks(hours, [f"{int(h):02d}:{int((h % 1) * 60):02d}" for h in hours])
+
+    # Configure x-axis with month labels and daily grid
+    num_points = len(sunrise) + future_steps
+
+    # Create month labels at regular intervals
+    x_ticks_months = np.linspace(0, num_points-1, 6)  # Show 6 month labels
+    current_date = current_datetime
+    start_date = current_date - timedelta(days=len(sunrise))
+    x_labels = [(start_date + timedelta(days=int(x))).strftime('%m/%Y') for x in x_ticks_months]
+
+    # Set monthly labels
+    plt.xticks(x_ticks_months, x_labels, rotation=45)
+
+    # Create daily grid lines
+    x_ticks_days = np.arange(0, num_points, 1)  # One tick per day
+
+    # Add grid
+    # Major grid for hours (horizontal lines)
+    plt.grid(True, which='major', axis='y', linestyle='-', alpha=0.3)
+
+    # Add vertical lines for each day
+    for x in x_ticks_days:
+        plt.axvline(x=x, color='gray', linestyle='-', alpha=0.1)
+
+    # Add finer grid for 15-minute intervals
+    plt.grid(True, which='minor', axis='y', linestyle=':', alpha=0.2)
+
+    # Labels and title
+    plt.xlabel('Mois')
+    plt.ylabel('Heure du lever du soleil')
+    plt.title('Prédictions du lever du soleil')
+
+    # Adjust layout and legend
+    plt.legend(loc='best')
+    plt.tight_layout()
+
+    plt.show()
+
+    # Extraire les 3 dernières prédictions (3 prochains jours)
+    future_predictions = mean_predictions[-future_steps:]
+    future_std = std_predictions[-future_steps:]
+
+    # Préparer l'affichage console
+    prediction_results = []
+    for i in range(future_steps):
+        next_date = current_datetime + timedelta(days=i+1)
+        predicted_hour = int(future_predictions[i].item())
+        predicted_minute = int((future_predictions[i].item() % 1) * 60)
+        confidence_minutes = int(future_std[i].item() * 60)
+
+        prediction_results.append({
+            'date': next_date.strftime('%Y-%m-%d'),
+            'time': f"{predicted_hour:02d}:{predicted_minute:02d}",
+            'confidence': confidence_minutes
+        })
+
+    return prediction_results
+
+def predict_next_three_days_sunset(time_sunset, sunset, current_datetime):
+    """
+    Predict sunset times for the next three days using the existing sinusoidal model
+    """
+    # Effectuer l'inférence avec le modèle existant
+    nuts_kernel = NUTS(model_sunset_sinusoidal)
+    mcmc = MCMC(nuts_kernel, num_samples=1000, warmup_steps=200)
+    mcmc.run(time_sunset, sunset)
+    samples = mcmc.get_samples()
+
+    # Créer les points temporels pour les trois prochains jours
+    # Comme le modèle utilise une période de 365 jours, nous devons ajuster les valeurs en conséquence
+    current_day_of_year = current_datetime.timetuple().tm_yday
+    next_three_days = torch.tensor([
+        current_day_of_year + 1,
+        current_day_of_year + 2,
+        current_day_of_year + 3
+    ], dtype=torch.float32)
+
+    # Faire les prédictions
+    predictive = Predictive(model_sunset_sinusoidal, samples)
+    predictions = predictive(next_three_days, None)
+
+    # Convertir les prédictions en heures et minutes
+    prediction_dates = []
+    prediction_times = []
+
+    mean_predictions = predictions["obs"].mean(axis=0)
+    std_predictions = predictions["obs"].std(axis=0)
+
+    for i in range(3):
+        next_date = current_datetime + timedelta(days=i+1)
+        # La prédiction donne l'heure en format décimal (ex: 6.5 pour 6h30)
+        predicted_hour = int(mean_predictions[i].item())
+        predicted_minute = int((mean_predictions[i].item() % 1) * 60)
+
+        prediction_dates.append(next_date.strftime('%Y-%m-%d'))
+        prediction_times.append(f"{predicted_hour:02d}:{predicted_minute:02d}")
+
+    return prediction_dates, prediction_times, mean_predictions, std_predictions
+
+def predict_and_display_sunset(time_sunset, sunset, current_datetime):
+    """
+    Predict sunset times and ensure consistent display between graph and console
+    """
+    # Effectuer l'inférence et les prédictions comme avant
+    nuts_kernel = NUTS(model_sunset_sinusoidal)
+    mcmc = MCMC(nuts_kernel, num_samples=1000, warmup_steps=200)
+    mcmc.run(time_sunset, sunset)
+    samples = mcmc.get_samples()
+
+    # Créer les points temporels pour le graphique (données historiques + 3 jours)
+    future_steps = 3
+    full_time = torch.arange(len(sunset) + future_steps, dtype=torch.float32)
+
+    # Faire les prédictions pour tout l'intervalle
+    predictive = Predictive(model_sunset_sinusoidal, samples)
+    predictions = predictive(full_time, None)
+
+    # Afficher le graphique avec toutes les données
+    plt.figure(figsize=(12, 6))
+    plt.plot(time_sunset.numpy(), sunset.numpy(), 'o', label='Données observées', alpha=0.5)
+
+    mean_predictions = predictions["obs"].mean(axis=0)
+    std_predictions = predictions["obs"].std(axis=0)
+
+    plt.plot(full_time.numpy(), mean_predictions.numpy(), 'r-', label='Prédictions')
+    plt.fill_between(
+        full_time.numpy(),
+        (mean_predictions - std_predictions).numpy(),
+        (mean_predictions + std_predictions).numpy(),
+        color='r', alpha=0.2, label='Intervalle de confiance'
+    )
+
+    # Configure y-axis (time of day)
+    hours = np.arange(4, 23, 0.25)  # From 4:00 to 22:00 with 15-min intervals
+    plt.yticks(hours, [f"{int(h):02d}:{int((h % 1) * 60):02d}" for h in hours])
+
+    # Configure x-axis with month labels and daily grid
+    num_points = len(sunset) + future_steps
+
+    # Create month labels at regular intervals
+    x_ticks_months = np.linspace(0, num_points-1, 6)  # Show 6 month labels
+    current_date = current_datetime
+    start_date = current_date - timedelta(days=len(sunset))
+    x_labels = [(start_date + timedelta(days=int(x))).strftime('%m/%Y') for x in x_ticks_months]
+
+    # Set monthly labels
+    plt.xticks(x_ticks_months, x_labels, rotation=45)
+
+    # Create daily grid lines
+    x_ticks_days = np.arange(0, num_points, 1)  # One tick per day
+
+    # Add grid
+    # Major grid for hours (horizontal lines)
+    plt.grid(True, which='major', axis='y', linestyle='-', alpha=0.3)
+
+    # Add vertical lines for each day
+    for x in x_ticks_days:
+        plt.axvline(x=x, color='gray', linestyle='-', alpha=0.1)
+
+    # Add finer grid for 15-minute intervals
+    plt.grid(True, which='minor', axis='y', linestyle=':', alpha=0.2)
+
+    # Labels and title
+    plt.xlabel('Mois')
+    plt.ylabel('Heure du coucher du soleil')
+    plt.title('Prédictions du coucher du soleil')
+
+    # Adjust layout and legend
+    plt.legend(loc='best')
+    plt.tight_layout()
+
+    plt.show()
+
+    # Extraire les 3 dernières prédictions (3 prochains jours)
+    future_predictions = mean_predictions[-future_steps:]
+    future_std = std_predictions[-future_steps:]
+
+    # Préparer l'affichage console
+    prediction_results = []
+    for i in range(future_steps):
+        next_date = current_datetime + timedelta(days=i+1)
+        predicted_hour = int(future_predictions[i].item())
+        predicted_minute = int((future_predictions[i].item() % 1) * 60)
+        confidence_minutes = int(future_std[i].item() * 60)
+
+        prediction_results.append({
+            'date': next_date.strftime('%Y-%m-%d'),
+            'time': f"{predicted_hour:02d}:{predicted_minute:02d}",
+            'confidence': confidence_minutes
+        })
+
+    return prediction_results
 
 def filtrer_donnees_mois_precedent(donnees_historiques):
     timestamps = donnees_historiques[0]['hourly']['time']
@@ -336,7 +650,7 @@ def stocker_donnees_json(energie_produite, current_datetime ):
     with open('donnees_graphs.json', 'w') as f:
         json.dump(donnees_existantes, f, indent=4)
 
-    print(f"Nouvelle donnée ajoutée: {donnees}")
+    #print(f"Nouvelle donnée ajoutée: {donnees}")
 
 def charger_donnees_historiques():
     try:
@@ -384,7 +698,7 @@ def afficher_graphique_quotidien(production_quotidienne):
 
     # Formater les dates au format 30/09/2024
     formatted_dates = [datetime.strptime(date, '%Y-%m-%d').strftime('%d/%m/%Y') for date in dates]
-    print("formatted_dates", formatted_dates)
+    #print("formatted_dates", formatted_dates)
 
     plt.figure(figsize=(10, 6))
     plt.plot(formatted_dates, production, marker='o', linestyle='-', color='blue', label='Énergie produite')
@@ -510,26 +824,64 @@ if __name__ == "__main__":
     temperatures, cloud_covers, sunrise, sunset, time_temperatures, time_sunrise, time_sunset = donnee_entrainement(donnees_historiques)
 
     # Effectuer l'inférence et les prédictions pour chaque variable
-    predictions_sunrise = effectuer_inference_et_prediction(model_sunrise_sinusoidal, sunrise, time_sunrise)
-    predictions_sunset = effectuer_inference_et_prediction(model_sunset_sinusoidal, sunset, time_sunset)
+    #predictions_sunrise = effectuer_inference_et_prediction(model_sunrise_sinusoidal, sunrise, time_sunrise)
+    #predictions_sunset = effectuer_inference_et_prediction(model_sunset_sinusoidal, sunset, time_sunset)
+     # Obtenir et afficher les prédictions
+    prediction_results_sunrise = predict_and_display_sunrise(time_sunrise, sunrise, current_datetime)
+    prediction_results_sunset = predict_and_display_sunset(time_sunset, sunset, current_datetime)
+    
     #predictions_temperature = effectuer_inference_et_prediction(model_temperature_seasonal, temperatures, time_temperatures)
     #predictions_cloud_covers = effectuer_inference_et_prediction(model_cloud_covers, cloud_covers, time_temperatures)
 
     # Afficher les résultats pour chaque variable
-    afficher_resultats(time_sunrise, sunrise, predictions_sunrise, 'Prédictions de l\'heure de lever du soleil avec Régression Linéaire Bayésienne', 'Heure de lever du soleil')
-    afficher_resultats(time_sunset, sunset, predictions_sunset, 'Prédictions de l\'heure de coucher du soleil avec Régression Linéaire Bayésienne', 'Heure de coucher du soleil')
+    #afficher_resultats(time_sunrise, sunrise, predictions_sunrise, 'Prédictions de l\'heure de lever du soleil avec Régression Linéaire Bayésienne', 'Heure de lever du soleil')
     #afficher_resultats(time_temperatures, temperatures, predictions_temperature, 'Prédictions de température avec Régression Linéaire Bayésienne', 'Température (°C)')
     #afficher_resultats(time_temperatures, cloud_covers, predictions_cloud_covers, 'Prédictions de la couverture nuageuse avec Régression Linéaire Bayésienne', 'Couverture nuageuse (%)')
 
+    # Obtenir les prédictions pour les trois prochains jours
+    prediction_dates_sunrise, prediction_times_sunrise, mean_predictions_sunrise, std_predictions_sunrise = predict_next_three_days_sunrise(time_sunrise, sunrise, current_datetime)
+     # Obtenir les prédictions pour les trois prochains jours
+    prediction_dates_sunset, prediction_times_sunset, mean_predictions_sunset, std_predictions_sunset = predict_next_three_days_sunset(time_sunset, sunset, current_datetime)
+
+    # Afficher les prédictions avec les intervalles de confiance
+    print("\nPrédictions du lever du soleil pour les trois prochains jours:")
+    print("=" * 70)
+    for i, (date, time) in enumerate(zip(prediction_dates_sunrise, prediction_times_sunrise)):
+        confidence_interval = f"±{std_predictions_sunrise[i].item()*60:.0f} minutes"
+        print(f"Date: {date} - Lever du soleil prévu à: {time} ({confidence_interval})")
+
+    #afficher prediction sunset
+    print("\nPrédictions du coucher du soleil pour les trois prochains jours:")
+    print("=" * 70)
+    for pred in prediction_results_sunset:
+        print(f"Date: {pred['date']} - Coucher du soleil prévu à: {pred['time']} (±{pred['confidence']} minutes)")
+    
+    # Calculer la durée entre le lever et le coucher du soleil
+    print("\nDurée entre le lever et le coucher du soleil pour les trois prochains jours:")
+    print("=" * 70)
+    durations = []
+    for sunrise_date, sunrise_time, sunset_pred in zip(prediction_dates_sunrise, prediction_times_sunrise, prediction_results_sunset):
+        # Convertir les temps en objets datetime (sans les secondes dans le format)
+        sunrise_datetime = datetime.strptime(f"{sunrise_date} {sunrise_time}", "%Y-%m-%d %H:%M")
+        sunset_datetime = datetime.strptime(f"{sunset_pred['date']} {sunset_pred['time']}", "%Y-%m-%d %H:%M")
+        
+        # Calculer la durée
+        duration = sunset_datetime - sunrise_datetime
+        durations.append(int(duration.total_seconds()))
+        
+        # Afficher la durée
+        print(f"Date: {sunrise_date} - Durée prévue: {duration}")
+    print("durations", durations)
+    sleep(50000)
     # Obtenir les données météorologiques actuelles
     data_meteo_actuelles_hourly = obtenir_donnees_meteo_actuelles_hourly(current_datetime)
-    print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_hourly))
-    print("Contenu de data_meteo_actuelles:", data_meteo_actuelles_hourly)
+    #print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_hourly))
+    #print("Contenu de data_meteo_actuelles:", data_meteo_actuelles_hourly)
     mettre_a_jour_historique_hourly(data_meteo_actuelles_hourly)
     if current_datetime.hour==23: #mettre a jour avec les donnée de la journée
         data_meteo_actuelles_daily = obtenir_donnees_meteo_actuelles_daily(current_datetime)
-        print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_daily))
-        print("Contenu de data_meteo_actuelles:", data_meteo_actuelles_daily)
+        #print("Type de data_meteo_actuelles:", type(data_meteo_actuelles_daily))
+        #print("Contenu de data_meteo_actuelles:", data_meteo_actuelles_daily)
         mettre_a_jour_historique_daily(data_meteo_actuelles_daily)
     
 
@@ -561,8 +913,7 @@ if __name__ == "__main__":
         filtered_timestamps, filtered_temperatures, filtered_cloud_covers = filtrer_donnees_mois_precedent(donnees_historiques)
         production_quotidienne = calculer_production_quotidienne(filtered_timestamps, filtered_temperatures, filtered_cloud_covers)
         afficher_graphique_quotidien(production_quotidienne)
-    
-
+# Afficher la durée d'ensoleillement pour les trois prochains jours
 #stocker les nouvelles valeurs dans un json hourly et daily
 #afficher un graphe de ce qui a ete produit jusqu'a present
 #jouer avec les graphiques pour afficher genre le surplus d'energie produite ou 
