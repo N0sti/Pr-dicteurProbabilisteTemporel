@@ -27,7 +27,7 @@ Le projet vise à prédire la production d'électricité d'un système photovolt
 
 5. **Prédiction des heures de lever et coucher du soleil** : À l'aide de modèles sinusoïdaux (pour le lever et le coucher du soleil), le projet prédit les horaires des deux événements pour les trois prochains jours.
 
-6. **Prédiction de la production future** : Utilisation de la régression linéaire bayésienne et de modèles basés sur les données historiques et météorologiques pour estimer la production future d'électricité.
+6. **Prédiction de la production future** : Utilisation des caractéristiques des panneaux (puissance, orientation, inclinaison, efficacité) et utilisation des prévisions de la température, des heures de lever et de coucher du soleil.
 
 7. **Affichage des résultats** : Les résultats de la prédiction et de la production d'énergie sont affichés sous forme de graphiques interactifs via une interface web.
 
@@ -39,7 +39,7 @@ Le projet vise à prédire la production d'électricité d'un système photovolt
 
 - **Python** : Le langage principal utilisé pour récupérer les données, effectuer les calculs et gérer les fichiers JSON.
 - **Matplotlib** : Utilisé pour l'affichage des graphiques de production d'énergie.
-- **Pyro** : Utilisé pour effectuer les prédictions avec régression linéaire bayésienne.
+- **Pyro** : Utilisé pour effectuer les prédictions avec régression bayésienne.
 - **Prophet** : Utilisé pour les prédictions de température, un modèle de prévision de séries temporelles.
 - **Flask** : Framework web pour créer l'interface utilisateur permettant de visualiser les données en temps réel.
 - **API Open-Meteo** : Pour récupérer les données météorologiques en temps réel.

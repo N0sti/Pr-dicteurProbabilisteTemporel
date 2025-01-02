@@ -766,13 +766,3 @@ if __name__ == "__main__":
     predictions_future = predire_production_electricite_heure_par_heure(future_temperatures_list, prediction_dates_sunrise, prediction_times_sunrise, prediction_dates_sunset, prediction_times_sunset)
     # Afficher le graphique de la production d'électricité
     afficher_graphique(predictions_future)
-# Afficher la durée d'ensoleillement pour les trois prochains jours
-#stocker les nouvelles valeurs dans un json hourly et daily
-#afficher un graphe de ce qui a ete produit jusqu'a present
-#jouer avec les graphiques pour afficher genre le surplus d'energie produite ou 
-#ce qui au contrainre a du etre achetrer pour combler le manque, l'argent economisé, etc
-#utiliser une Régression linéaire bayésienne pour prédire la production d'électricité avec Pyro
-#pour prédire la production d'électricité future, on va devoir prédire les variable de notre code qui ici sont l'ensoleillement moyen et la température moyenne
-#pour predire ces variables, on vas utiliser les donnée sur ensoleillement moyen et la température moyenne et la duree d'ensoleillemnt, qu'on aura stoker a chaque fois qu'on va les recuperer
-#Faire un site web pour afficher les données et les predictions
-#afficher sur le passee l'ecart entre les prediction de production d'energie et la production d'energie reel
