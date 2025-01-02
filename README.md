@@ -9,7 +9,7 @@ Le projet vise à prédire la production d'électricité d'un système photovolt
 - **Prédiction de la production d'énergie** : Utilisation des données météorologiques (ensoleillement, température, couverture nuageuse) pour prédire la production d'électricité des panneaux photovoltaïques.
 - **Récupération des données météorologiques** : Intégration de l'API Open-Meteo pour récupérer les données météorologiques en temps réel (température, couverture nuageuse, etc.).
 - **Mise à jour de l'historique** : Enregistrement des données météorologiques et de la production d'énergie dans un fichier JSON pour un suivi historique.
-- **Modèles de prédiction de la production** : Utilisation de modèles comme la régression linéaire bayésienne et des modèles sinusoïdaux pour estimer la production d'électricité future.
+- **Modèles de prédiction de la production** : Utilisation des prévisions de la température, des heures de lever et de coucher du soleil. estimer la production d'électricité future.
 - **Prédiction des heures de lever et coucher du soleil** : Modélisation des heures de lever et coucher du soleil à l'aide de fonctions sinusoïdales, prédisant les événements pour les trois prochains jours.
 - **Interface Web** : Une interface web développée avec Flask pour afficher en temps réel les graphiques de production d'énergie et les prédictions.
 - **Analyse des économies d'énergie** : Estimation de l'énergie économisée par rapport à la consommation estimée et comparaison avec une production d'énergie de référence.
