@@ -346,7 +346,7 @@ def predict_and_display_sunrise(time_sunrise, sunrise, current_datetime):
     plt.legend(loc='best')
     plt.tight_layout()
 
-    plt.show()
+    #plt.show()
 
     # Extraire les 3 dernières prédictions (3 prochains jours)
     future_predictions = mean_predictions[-future_steps:]
@@ -481,7 +481,7 @@ def predict_and_display_sunset(time_sunset, sunset, current_datetime):
     plt.legend(loc='best')
     plt.tight_layout()
 
-    plt.show()
+    #plt.show()
 
     # Extraire les 3 dernières prédictions (3 prochains jours)
     future_predictions = mean_predictions[-future_steps:]
@@ -589,7 +589,7 @@ def afficher_graphique(predictions_future=None):
     # Enregistrement du graphique
     plt.savefig(file_path)  # Remplace automatiquement l'image existante
     plt.close()  # Ferme la figure pour libérer de la mémoire
-    plt.show()
+    #plt.show()
 
 def get_current_datetime():
     # Obtenez la date et l'heure actuelle
@@ -644,7 +644,7 @@ def afficher_resultats_prophet(df, forecast):
     plt.xticks(rotation=45)
     
     plt.tight_layout()
-    plt.show()
+    #plt.show()
 
 def predire_production_electricite_heure_par_heure(future_temperatures_list, prediction_dates_sunrise, prediction_times_sunrise, prediction_dates_sunset, prediction_times_sunset):
     predictions_future = []

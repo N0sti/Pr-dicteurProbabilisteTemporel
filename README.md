@@ -85,3 +85,11 @@ Le projet vise à prédire la production d'électricité d'un système photovolt
    ```bash
    git clone https://github.com/N0sti/Pr-dicteurProbabilisteTemporel.git
    cd projet-production-solaire
+2. Import nécessaire
+   Python est un prérequis pour faire tourner le code
+   ```bash
+   pip install requests matplotlib numpy torch pandas prophet pyro-ppl
+   ```
+3. Faire tourner le code
+   ```bash
+   python app.py
