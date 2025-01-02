@@ -43,4 +43,5 @@ def afficher_graphique():
 if __name__ == '__main__':
     # Lancer SolarPredict dans un thread séparé pour s'exécuter périodiquement
     threading.Thread(target=run_solar_predict, daemon=True).start()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
