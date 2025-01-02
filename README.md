@@ -93,7 +93,7 @@ Le projet vise à prédire la production d'électricité d'un système photovolt
 3. Faire tourner le code
    ```bash
    python app.py
-#### Lancer le code sur une raspberry pi
+### Lancer le code sur une raspberry pi
 Voici un résumé des commandes que vous devrez exécuter pour lancer le projet sur votre raspberry pi :
 
 1. Mettre à jour le système :
@@ -120,22 +120,22 @@ pip install requests matplotlib numpy torch pandas prophet pyro-ppl
 ```
 6. Utilisation de screen
 Screen va vous permetre d'exécuter et de gérer des processus en arrière-plan.
-  * Installer screen (si ce n'est pas déjà installé) :
-    ```bash
-    sudo apt-get install screen
-    ```
-  * Démarrer une nouvelle session screen :
-    ```bash
-    screen -S mysession
-    ```
-  * Lancer votre script ou commande :
-    ```bash
-    python app.py
-    ```
-  * Détacher la session screen :
-    Appuyez sur Ctrl+A puis D. Cela détachera la session screen et vous ramènera à votre terminal SSH, mais le processus continuera à s'exécuter en arrière-plan.
+    * Installer screen (si ce n'est pas déjà installé) :
+      ```bash
+      sudo apt-get install screen
+      ```
+    * Démarrer une nouvelle session screen :
+      ```bash
+      screen -S mysession
+      ```
+    * Lancer votre script ou commande :
+      ```bash
+      python app.py
+      ```
+    * Détacher la session screen :
+      Appuyez sur Ctrl+A puis D. Cela détachera la session screen et vous ramènera à votre terminal SSH, mais le processus continuera à s'exécuter en arrière-plan.
 
-  * Se reconnecter à la session screen (si nécessaire) :
-    ```bash
-    screen -r mysession
-    ```
+    * Se reconnecter à la session screen (si nécessaire) :
+      ```bash
+      screen -r mysession
+      ```
