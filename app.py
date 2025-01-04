@@ -17,20 +17,31 @@ def run_solar_predict():
                 os.system("python SolarPredict.py")  # Exécuter tout le fichier SolarPredict
             finally:
                 solar_predict_running = False  # Indiquer que SolarPredict a terminé
-        time.sleep(3600)  # Attendre une heure avant la prochaine exécution
+        time.sleep(300)  # Attendre une heure avant la prochaine exécution
 
 @app.route('/')
 def home():
     global solar_predict_running
 
-    # Si SolarPredict est en cours d'exécution, afficher "En cours de chargement"
+    # Chemin du fichier du graphique
     file_path = "graphique.png"
+
     if solar_predict_running:
-        return render_template("index.html", graphique=False, en_cours=True)
-    elif os.path.exists(file_path):
-        return render_template("index.html", graphique=True, en_cours=False)
+        # Si SolarPredict est en cours d'exécution
+        if os.path.exists(file_path):
+            # Si un graphique existe déjà
+            return render_template("index.html", graphique=True, en_cours=True)
+        else:
+            # Si aucun graphique n'existe
+            return render_template("index.html", graphique=False, en_cours=True)
     else:
-        return render_template("index.html", graphique=False, en_cours=False)
+        # Si SolarPredict n'est pas en cours d'exécution
+        if os.path.exists(file_path):
+            # Si un graphique existe déjà
+            return render_template("index.html", graphique=True, en_cours=False)
+        else:
+            # Si aucun graphique n'existe
+            return render_template("index.html", graphique=False, en_cours=False)
 
 @app.route('/graphique')
 def afficher_graphique():
@@ -38,10 +49,9 @@ def afficher_graphique():
     if os.path.exists(file_path):
         return send_file(file_path, mimetype='image/png')
     else:
-        return "<h1>Graphique non disponible. Veuillez le générer d'abord.</h1>"
+        return "<h1>Graphique non disponible. Le code est en cour d'exécution.</h1>"
 
 if __name__ == '__main__':
     # Lancer SolarPredict dans un thread séparé pour s'exécuter périodiquement
     threading.Thread(target=run_solar_predict, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, debug=True)
-

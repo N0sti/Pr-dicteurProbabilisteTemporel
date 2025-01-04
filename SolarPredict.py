@@ -161,12 +161,29 @@ def mettre_a_jour_historique_daily(data):
     print("Historique mis à jour avec succès.")
 
 # Fonction pour prédire la production d'électricité en temps réel
-def predire_production_electricite(puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
+def predire_production_electricite1(puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
                                    efficacite_panneaux, ensoleillement_actuel, inclinaison_panneaux,
                                    orientation_panneaux, facteur_de_performance, temperature_actuelle, current_datetime, sunrise_time, sunset_time ):
-    
+    # Convert sunrise_time and sunset_time to datetime objects
+    sunrise_time = datetime.strptime(sunrise_time, '%Y-%m-%dT%H:%M')
+    sunset_time = datetime.strptime(sunset_time, '%Y-%m-%dT%H:%M')
     if sunset_time <= current_datetime <= sunrise_time:
         return 0  # Il fait nuit, donc l'énergie produite est 0
+    puissance_installée = puissance_nominale_par_panneau * nombre_de_panneaux / 1000  # kWc
+    surface_totale = surface_par_panneau * nombre_de_panneaux  # m²
+
+    # Ajustement de l'efficacité en fonction de la température
+    temperature_coefficient = -0.004  # Coefficient de température typique pour les panneaux solaires
+    temperature_standard = 25  # Température standard de test (STC)
+    efficacite_ajustee = efficacite_panneaux * (1 + temperature_coefficient * (temperature_actuelle - temperature_standard))
+
+    energie_produite_heure = puissance_installée * ensoleillement_actuel * efficacite_ajustee * facteur_de_performance  # kWh
+    return energie_produite_heure
+
+def predire_production_electricite2(puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
+                                   efficacite_panneaux, ensoleillement_actuel, inclinaison_panneaux,
+                                   orientation_panneaux, facteur_de_performance, temperature_actuelle):
+    
     puissance_installée = puissance_nominale_par_panneau * nombre_de_panneaux / 1000  # kWc
     surface_totale = surface_par_panneau * nombre_de_panneaux  # m²
 
@@ -667,7 +684,7 @@ def predire_production_electricite_heure_par_heure(future_temperatures_list, pre
 
         ensoleillement_futur = 1.0 if sunrise_time <= time <= sunset_time else 0.0
 
-        energie_produite_future = predire_production_electricite(
+        energie_produite_future = predire_production_electricite2(
             puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
             efficacite_panneaux, ensoleillement_futur, inclinaison_panneaux,
             orientation_panneaux, facteur_de_performance, temperature)
@@ -746,15 +763,20 @@ if __name__ == "__main__":
     if current_datetime.hour==23: #mettre a jour avec les donnée de la journée
         data_meteo_actuelles_daily = obtenir_donnees_meteo_actuelles_daily(current_datetime)
         mettre_a_jour_historique_daily(data_meteo_actuelles_daily)
+    else:
+        data_meteo_actuelles_dailytemp = obtenir_donnees_meteo_actuelles_daily(current_datetime)
+        today_sunset = data_meteo_actuelles_dailytemp['daily']['sunset'][0]  # Prenez la première valeur si c'est une liste
+        today_sunrise = data_meteo_actuelles_dailytemp['daily']['sunrise'][0]  # Prenez la première valeur si c'est une liste
+
     
 
     # Calculer l'ensoleillement et la température actuels
     ensoleillement_actuel, temperature_actuelle = calculer_ensoleillement_et_temperature(data_meteo_actuelles_hourly)
 
     # Prédire la production d'électricité en temps réel
-    energie_produite = predire_production_electricite(puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
+    energie_produite = predire_production_electricite1(puissance_nominale_par_panneau, nombre_de_panneaux, surface_par_panneau,
                                    efficacite_panneaux, ensoleillement_actuel, inclinaison_panneaux,
-                                   orientation_panneaux, facteur_de_performance, temperature_actuelle, current_datetime, sunrise_time, sunset_time)
+                                   orientation_panneaux, facteur_de_performance, temperature_actuelle, current_datetime, today_sunrise, today_sunset)
 
     # Stocker les nouvelles valeurs dans un fichier JSON
     stocker_donnees_json(energie_produite, current_datetime)
