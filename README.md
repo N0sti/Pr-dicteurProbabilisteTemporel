@@ -94,7 +94,7 @@ Le projet vise à prédire la production d'électricité d'un système photovolt
    ```bash
    python app.py
 ### Lancer le code sur une raspberry pi
-Voici un résumé des commandes que vous devrez exécuter pour lancer le projet sur votre raspberry pi :
+Voici un résumé des commandes que vous devrez exécuter pour lancer le projet sur votre raspberry pi via ssh:
 
 1. Mettre à jour le système :
 ```bash
