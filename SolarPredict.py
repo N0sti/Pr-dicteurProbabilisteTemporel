@@ -167,8 +167,13 @@ def predire_production_electricite1(puissance_nominale_par_panneau, nombre_de_pa
     # Convert sunrise_time and sunset_time to datetime objects
     sunrise_time = datetime.strptime(sunrise_time, '%Y-%m-%dT%H:%M')
     sunset_time = datetime.strptime(sunset_time, '%Y-%m-%dT%H:%M')
-    if sunset_time <= current_datetime <= sunrise_time:
+    print("sunrise_time", sunrise_time)
+    print("sunset_time", sunset_time)
+    print("current_datetime", current_datetime)
+    print(current_datetime < sunrise_time or current_datetime > sunset_time)
+    if current_datetime < sunrise_time or current_datetime > sunset_time:
         return 0  # Il fait nuit, donc l'énergie produite est 0
+
     puissance_installée = puissance_nominale_par_panneau * nombre_de_panneaux / 1000  # kWc
     surface_totale = surface_par_panneau * nombre_de_panneaux  # m²
 
@@ -762,6 +767,8 @@ if __name__ == "__main__":
     mettre_a_jour_historique_hourly(data_meteo_actuelles_hourly)
     if current_datetime.hour==23: #mettre a jour avec les donnée de la journée
         data_meteo_actuelles_daily = obtenir_donnees_meteo_actuelles_daily(current_datetime)
+        today_sunset = data_meteo_actuelles_daily['daily']['sunset'][0]  # Prenez la première valeur si c'est une liste
+        today_sunrise = data_meteo_actuelles_daily['daily']['sunrise'][0]  # Prenez la première valeur si c'est une liste
         mettre_a_jour_historique_daily(data_meteo_actuelles_daily)
     else:
         data_meteo_actuelles_dailytemp = obtenir_donnees_meteo_actuelles_daily(current_datetime)
