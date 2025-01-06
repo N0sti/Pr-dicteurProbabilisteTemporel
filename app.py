@@ -17,7 +17,7 @@ def run_solar_predict():
                 os.system("python SolarPredict.py")  # Exécuter tout le fichier SolarPredict
             finally:
                 solar_predict_running = False  # Indiquer que SolarPredict a terminé
-        time.sleep(300)  # Attendre une heure avant la prochaine exécution
+        time.sleep(3600)  # Attendre une heure avant la prochaine exécution
 
 @app.route('/')
 def home():
